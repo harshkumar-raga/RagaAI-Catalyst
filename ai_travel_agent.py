@@ -16,15 +16,15 @@ import openai
 from openai import AsyncOpenAI
 
 catalyst = RagaAICatalyst(
-    access_key="saLy6KmMVlfAzunuQGS9",
-    secret_key="lm39fd4KXffM6gzLjnY9G7QReffhH4RGZPursp3A",
-    base_url="http://52.172.168.127/api"
+    access_key="access_key",
+    secret_key="secret_key",
+    base_url="base_url"
 )
 # Initialize tracer
 tracer = Tracer(
-    project_name="prompt_metric_dataset",
-    dataset_name="ChatOpenAI_tan",
-    tracer_type="anything",
+    project_name="project_name",
+    dataset_name="dataset_name",
+    tracer_type="tracer_type",
     metadata={
         "model": "gpt-3.5-turbo",
         "environment": "production"
@@ -114,7 +114,7 @@ class ItineraryAgent:
     def __init__(self, persona="Itinerary Agent"):
         self.persona = persona
 
-    @tracer.trace_llm(name="plan_itinerary")
+    @tracer.trace_agent(name="plan_itinerary")
     def plan_itinerary(self, user_preferences, duration=3):
         # Get weather information
         weather = weather_tool(user_preferences["destination"])
