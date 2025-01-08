@@ -131,6 +131,9 @@ class UploadAgenticTraces:
                                         headers=headers, 
                                         data=payload,
                                         timeout=self.timeout)
+            if response.status_code != 200:
+                print(f"Error inserting traces: {response.json()['message']}")
+                return None
         except requests.exceptions.RequestException as e:
             print(f"Error while inserting traces: {e}")
             return None
