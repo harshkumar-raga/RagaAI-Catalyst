@@ -13,10 +13,6 @@ def upload_code(hash_id, zip_path, project_name, dataset_name):
         _put_zip_presigned_url(project_name, presigned_url, zip_path)
 
         response = _insert_code(dataset_name, hash_id, presigned_url, project_name)
-
-        if response.status_code != 200 or response.status_code != 201:
-            raise Exception(f"Failed to insert code: {response.json()['message']}")
-
         return response
     else:
         return "Code already exists"
