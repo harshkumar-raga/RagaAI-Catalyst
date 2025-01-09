@@ -6,20 +6,18 @@ import uuid
 from typing import Optional, Any
 
 class TracedFile:
-    def __init__(self, file_obj, file_path: str, mode: str, tracer):
+    def __init__(self, file_obj, file_path: str, tracer):
         self._file = file_obj
         self._file_path = file_path
-        self._mode = mode
         self._tracer = tracer
 
     def write(self, content: str) -> int:
-        bytes_written = self._file.write(content)
-        self._tracer.trace_file_operation("write", self._file_path, content=content, bytes_count=bytes_written)
-        return bytes_written
+        self._tracer.trace_file_operation("write", self._file_path, content=content)
+        return 
 
     def read(self, size: Optional[int] = None) -> str:
         content = self._file.read() if size is None else self._file.read(size)
-        self._tracer.trace_file_operation("read", self._file_path, content=content, bytes_count=len(content))
+        self._tracer.trace_file_operation("read", self._file_path, content=content)
         return content
 
     def close(self) -> None:
@@ -77,8 +75,8 @@ class UserInteractionTracer:
 
     def traced_open(self, file: str, mode: str = 'r', *args, **kwargs):
         file_obj = self.original_open(file, mode, *args, **kwargs)
-        self.trace_file_operation("open", file, mode=mode)
-        return TracedFile(file_obj, file, mode, self)
+        self.trace_file_operation("open", file)
+        return TracedFile(file_obj, file, self)
 
     def trace_file_operation(self, operation: str, file_path: str, **kwargs):
         interaction = {
