@@ -9,21 +9,23 @@ from concurrent.futures import ThreadPoolExecutor
 
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from .exporters.file_span_exporter import FileSpanExporter
-from .exporters.raga_exporter import RagaExporter
-from .instrumentators import (
+from ragaai_catalyst.tracers.exporters.file_span_exporter import FileSpanExporter
+from ragaai_catalyst.tracers.exporters.raga_exporter import RagaExporter
+from ragaai_catalyst.tracers.instrumentators import (
     LangchainInstrumentor,
     OpenAIInstrumentor,
     LlamaIndexInstrumentor,
 )
-from .utils import get_unique_key
-# from .llamaindex_callback import LlamaIndexTracer
-from ..ragaai_catalyst import RagaAICatalyst
+from ragaai_catalyst.tracers.utils import get_unique_key
+# from ragaai_catalyst.tracers.llamaindex_callback import LlamaIndexTracer
+from ragaai_catalyst import RagaAICatalyst
+from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing, TrackName
+from ragaai_catalyst.tracers.agentic_tracing.tracers.llm_tracer import LLMTracerMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Tracer:
+class Tracer(AgenticTracing):
     NUM_PROJECTS = 100
     TIMEOUT = 10
     def __init__(
@@ -41,6 +43,7 @@ class Tracer:
 
         Args:
             project_name (str): The name of the project.
+            dataset_name (str): The name of the dataset.
             tracer_type (str, optional): The type of tracer. Defaults to None.
             pipeline (dict, optional): The pipeline configuration. Defaults to None.
             metadata (dict, optional): The metadata. Defaults to None.
@@ -50,16 +53,28 @@ class Tracer:
         Returns:
             None
         """
+        # Set auto_instrument_llm to True to enable automatic LLM tracing
+        user_detail = {
+            "project_name": project_name,
+            "project_id": None,  # Will be set after project validation
+            "dataset_name": dataset_name,
+            "trace_user_detail": {"metadata": metadata} if metadata else {}
+        }
+        super().__init__(user_detail=user_detail, auto_instrument_llm=True)
+        self.is_active = True
         self.project_name = project_name
         self.dataset_name = dataset_name
         self.tracer_type = tracer_type
         self.metadata = self._improve_metadata(metadata, tracer_type)
+        # self.metadata["total_cost"] = 0.0
+        # self.metadata["total_tokens"] = 0
         self.pipeline = pipeline
         self.description = description
         self.upload_timeout = upload_timeout
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
         self.num_projects = 100
+        self.start_time = datetime.datetime.now(datetime.timezone.utc)
 
         try:
             response = requests.get(
@@ -81,6 +96,9 @@ class Tracer:
             self.project_id = [
                 project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
             ][0]
+            # super().__init__(user_detail=self._pass_user_data())
+            # self.file_tracker = TrackName()
+            self._pass_user_data()
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve projects list: {e}")
@@ -95,10 +113,12 @@ class Tracer:
             self._upload_task = None
         elif tracer_type == "llamaindex":
             self._upload_task = None
-            from .llamaindex_callback import LlamaIndexTracer
+            from ragaai_catalyst.tracers.llamaindex_callback import LlamaIndexTracer
 
         else:
-            raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
+            self._upload_task = None
+            # raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
+        
 
     def _improve_metadata(self, metadata, tracer_type):
         if metadata is None:
@@ -155,9 +175,11 @@ class Tracer:
             print(f"Tracer started for project: {self.project_name}")
             return self
         elif self.tracer_type == "llamaindex":
-            from .llamaindex_callback import LlamaIndexTracer
+            from ragaai_catalyst.tracers.llamaindex_callback import LlamaIndexTracer
             return LlamaIndexTracer(self._pass_user_data()).start()
-            
+        else:
+            super().start()
+            return self
 
     def stop(self):
         """Stop the tracer and initiate trace upload."""
@@ -171,8 +193,10 @@ class Tracer:
             self._upload_task = self._run_async(self._upload_traces())
             return "Trace upload initiated. Use get_upload_status() to check the status."
         elif self.tracer_type == "llamaindex":
-            from .llamaindex_callback import LlamaIndexTracer
-            return LlamaIndexTracer().stop()
+            from ragaai_catalyst.tracers.llamaindex_callback import LlamaIndexTracer
+            return LlamaIndexTracer(self._pass_user_data()).stop()
+        else:
+            super().stop()
 
     def get_upload_status(self):
         """Check the status of the trace upload."""
@@ -262,6 +286,7 @@ class Tracer:
         # Reset instrumentation flag
         self.is_instrumented = False
         # Note: We're not resetting all attributes here to allow for upload status checking
+
     def _pass_user_data(self):
         return {"project_name":self.project_name, 
                 "project_id": self.project_id,
