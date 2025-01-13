@@ -412,7 +412,7 @@ def zip_list_of_unique_files(filepaths, output_dir=None):
     if output_dir is None:
         # Set default output directory based on environment
         if JupyterNotebookHandler.is_running_in_colab():
-            output_dir = '/content'
+            output_dir = '/content/traces'
         else:
             output_dir = os.getcwd()
     
