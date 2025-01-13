@@ -185,6 +185,8 @@ class JupyterNotebookHandler:
             logger.warning(f"Error getting notebook path: {str(e)}")
             return None
 
+
+
 class CommandCommenter(ast.NodeTransformer):
     def visit_Expr(self, node):
         # Check if the expression is a call to a function that starts with '!'
@@ -415,6 +417,7 @@ class TraceDependencyTracker:
                 # Retrieve the current cell content dynamically in Colab
                 current_cell = ipython.history_manager.get_range()
                 script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
+                script_content = comment_magic_commands(script_content)  # Comment out magic commands
 
                 # Save the retrieved script content to a file in the traces directory
                 file_name = "dynamic_check_environment.py"
