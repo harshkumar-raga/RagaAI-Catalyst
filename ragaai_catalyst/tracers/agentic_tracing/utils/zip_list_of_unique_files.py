@@ -347,86 +347,86 @@ class TraceDependencyTracker:
         logger.info(f"Zip file created: {zip_filename}")
         return hash_id, zip_filename
 
-def check_environment_and_save(self):
-    """Check if running in Colab and save current cell content as a Jupyter notebook in the zip folder."""
-    try:
-        from IPython import get_ipython
-        ipython = get_ipython()
-        
-        # Create a basic notebook structure
-        notebook = {
-            "cells": [],
-            "metadata": {
-                "kernelspec": {
-                    "display_name": "Python 3",
-                    "language": "python",
-                    "name": "python3"
-                },
-                "language_info": {
-                    "codemirror_mode": {
-                        "name": "ipython",
-                        "version": 3
-                    },
-                    "file_extension": ".py",
-                    "mimetype": "text/x-python",
-                    "name": "python",
-                    "nbconvert_exporter": "python",
-                    "pygments_lexer": "ipython3",
-                    "version": "3.8.0"
-                }
-            },
-            "nbformat": 4,
-            "nbformat_minor": 4
-        }
-
-        if 'google.colab' in sys.modules:
-            # Retrieve the current cell content dynamically in Colab
-            current_cell = ipython.history_manager.get_range()
+    def check_environment_and_save(self):
+        """Check if running in Colab and save current cell content as a Jupyter notebook in the zip folder."""
+        try:
+            from IPython import get_ipython
+            ipython = get_ipython()
             
-            # Process each cell and add to notebook
-            for _, _, input_line in current_cell:
-                if input_line.strip():
+            # Create a basic notebook structure
+            notebook = {
+                "cells": [],
+                "metadata": {
+                    "kernelspec": {
+                        "display_name": "Python 3",
+                        "language": "python",
+                        "name": "python3"
+                    },
+                    "language_info": {
+                        "codemirror_mode": {
+                            "name": "ipython",
+                            "version": 3
+                        },
+                        "file_extension": ".py",
+                        "mimetype": "text/x-python",
+                        "name": "python",
+                        "nbconvert_exporter": "python",
+                        "pygments_lexer": "ipython3",
+                        "version": "3.8.0"
+                    }
+                },
+                "nbformat": 4,
+                "nbformat_minor": 4
+            }
+
+            if 'google.colab' in sys.modules:
+                # Retrieve the current cell content dynamically in Colab
+                current_cell = ipython.history_manager.get_range()
+                
+                # Process each cell and add to notebook
+                for _, _, input_line in current_cell:
+                    if input_line.strip():
+                        cell = {
+                            "cell_type": "code",
+                            "execution_count": None,
+                            "metadata": {},
+                            "outputs": [],
+                            "source": input_line
+                        }
+                        notebook["cells"].append(cell)
+            else:
+                # If not in Colab, try to get the current notebook content
+                try:
+                    notebook_path = self.jupyter_handler.get_notebook_path()
+                    if notebook_path and os.path.exists(notebook_path):
+                        with open(notebook_path, 'r', encoding='utf-8') as f:
+                            notebook = json.load(f)
+                except Exception as e:
+                    logger.warning(f"Could not read existing notebook: {e}")
+                    # Create a single cell with a message
                     cell = {
                         "cell_type": "code",
                         "execution_count": None,
                         "metadata": {},
                         "outputs": [],
-                        "source": input_line
+                        "source": "# Environment check notebook\n# Not running in Colab"
                     }
                     notebook["cells"].append(cell)
-        else:
-            # If not in Colab, try to get the current notebook content
-            try:
-                notebook_path = self.jupyter_handler.get_notebook_path()
-                if notebook_path and os.path.exists(notebook_path):
-                    with open(notebook_path, 'r', encoding='utf-8') as f:
-                        notebook = json.load(f)
-            except Exception as e:
-                logger.warning(f"Could not read existing notebook: {e}")
-                # Create a single cell with a message
-                cell = {
-                    "cell_type": "code",
-                    "execution_count": None,
-                    "metadata": {},
-                    "outputs": [],
-                    "source": "# Environment check notebook\n# Not running in Colab"
-                }
-                notebook["cells"].append(cell)
 
-        # Save as .ipynb file
-        file_name = "dynamic_check_environment.ipynb"
-        file_path = os.path.join(self.output_dir, file_name)
+            # Save as .ipynb file
+            file_name = "dynamic_check_environment.ipynb"
+            file_path = os.path.join(self.output_dir, file_name)
 
-        with open(file_path, "w", encoding='utf-8') as file:
-            json.dump(notebook, file, indent=2)
-            
-        # Add the file to tracked files
-        self.tracked_files.add(os.path.abspath(file_path))
-        logger.info(f"Successfully saved notebook to {file_path}")
-            
-    except Exception as e:
-        logger.warning(f"Error creating notebook file: {e}")
-        
+            with open(file_path, "w", encoding='utf-8') as file:
+                json.dump(notebook, file, indent=2)
+                
+            # Add the file to tracked files
+            self.tracked_files.add(os.path.abspath(file_path))
+            logger.info(f"Successfully saved notebook to {file_path}")
+                
+        except Exception as e:
+            logger.warning(f"Error creating notebook file: {e}")
+
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
     tracker = TraceDependencyTracker(output_dir)
