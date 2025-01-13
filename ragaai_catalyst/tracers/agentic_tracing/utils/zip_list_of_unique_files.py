@@ -388,17 +388,19 @@ class TraceDependencyTracker:
             ipython = get_ipython()
             if 'google.colab' in sys.modules:
                 logger.info("Running on Google Colab.")
-                current_path = self.output_dir  # Save in the output directory
-                logger.info("Current path for saving:", current_path)
+                
+                # Create traces directory if it doesn't exist
+                traces_dir = os.path.join(os.getcwd(), 'traces')
+                os.makedirs(traces_dir, exist_ok=True)
+                logger.info("Current path for saving:", traces_dir)
 
                 # Retrieve the current cell content dynamically in Colab
                 current_cell = ipython.history_manager.get_range()
                 script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
 
-                # Save the retrieved script content to a file
+                # Save the retrieved script content to a file in the traces directory
                 file_name = "dynamic_check_environment.ipynb"
-                current_path = current_path / "traces"  # Corrected to use a string for the directory name
-                file_path = os.path.join(current_path, file_name)
+                file_path = os.path.join(traces_dir, file_name)
 
                 with open(file_path, "w") as file:
                     file.write(script_content)
