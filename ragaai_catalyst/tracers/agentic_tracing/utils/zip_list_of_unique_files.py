@@ -84,110 +84,113 @@ def remove_package_code(source_code: str, package_name: str) -> str:
 
 class JupyterNotebookHandler:
     @staticmethod
+    def is_running_in_colab():
+        """Check if the code is running in Google Colab."""
+        try:
+            import google.colab
+            return True
+        except ImportError:
+            return False
+    
+    @staticmethod
     def is_running_in_notebook():
-        """Check if the code is running in a Jupyter notebook."""
+        """Check if the code is running in a Jupyter notebook or Colab."""
         try:
             shell = get_ipython().__class__.__name__
+            if JupyterNotebookHandler.is_running_in_colab():
+                return True
             return shell == 'ZMQInteractiveShell'
         except:
             return False
     
     @staticmethod
     def get_notebook_path():
-        """Get the path of the current executing Jupyter notebook."""
+        """Get the path of the current executing notebook."""
         try:
-            import IPython
-            import json
-            from pathlib import Path
+            # First check if we're in Colab
+            if JupyterNotebookHandler.is_running_in_colab():
+                from google.colab import _file_io
+                import json
+                
+                # Get the current notebook name from Colab
+                try:
+                    notebook_path = _file_io.get_notebook_path()
+                    if notebook_path:
+                        return notebook_path
+                except:
+                    # Fallback: Try to find .ipynb files in the current directory
+                    ipynb_files = list(Path('/content').glob('*.ipynb'))
+                    if ipynb_files:
+                        # Use the most recently modified notebook
+                        return str(max(ipynb_files, key=os.path.getmtime))
             
-            # Get the IPython instance
+            # If not in Colab, try regular Jupyter notebook detection
+            import IPython
             ipython = IPython.get_ipython()
             
             if ipython is None:
                 return None
             
-            # Get kernel file path
             if hasattr(ipython, 'kernel') and hasattr(ipython.kernel, 'session'):
                 kernel_file = ipython.kernel.session.config.get('IPKernelApp', {}).get('connection_file', '')
                 if kernel_file:
-                    try:
-                        # Read the kernel file to get more information
-                        with open(kernel_file, 'r') as f:
-                            kernel_info = json.load(f)
-                    except Exception as e:
-                        print(f"Debug: Could not read kernel file: {e}")
-                    
-                    # Get the kernel ID from the file name
                     kernel_id = Path(kernel_file).stem
-                    
-                    # Look for notebooks in the current directory and its parents
                     current_dir = Path.cwd()
-                    
-                    # First, try to find notebooks that are currently being edited
                     notebooks = list(current_dir.glob('*.ipynb'))
                     
                     if notebooks:
-                        # First, try to match notebooks modified in the last hour
+                        # Check for recently modified notebooks
                         import time
                         current_time = time.time()
                         recent_notebooks = [
                             nb for nb in notebooks 
-                            if os.path.getmtime(nb) > current_time - 3600  # Last hour
+                            if os.path.getmtime(nb) > current_time - 3600
                             and '.ipynb_checkpoints' not in str(nb)
                         ]
                         
                         if recent_notebooks:
-                            # Get the most recently modified notebook
-                            current_notebook = max(recent_notebooks, key=os.path.getmtime)
-                            return str(current_notebook)
-                            
-                        # If no recently modified notebooks, try reading each notebook
-                        # to find one with matching kernel info
-                        for notebook in notebooks:
-                            if '.ipynb_checkpoints' in str(notebook):
-                                continue
-                            try:
-                                with open(notebook, 'r', encoding='utf-8') as f:
-                                    nb_content = json.load(f)
-                                    if 'metadata' in nb_content and 'kernelspec' in nb_content['metadata']:
-                                        return str(notebook)
-                            except Exception as e:
-                                print(f"Debug: Error reading notebook {notebook}: {e}")
-                    
-                    return None
+                            return str(max(recent_notebooks, key=os.path.getmtime))
+            
+            return None
             
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-        
-        return None
+            logger.warning(f"Error getting notebook path: {str(e)}")
+            return None
 
-
-# TraceDependencyTracker class
 class TraceDependencyTracker:
     def __init__(self, output_dir=None):
         self.tracked_files = set()
         self.python_imports = set()
         self.output_dir = output_dir or os.getcwd()
         self.jupyter_handler = JupyterNotebookHandler()
+        
+        # Set appropriate output directory for Colab
+        if self.jupyter_handler.is_running_in_colab():
+            self.output_dir = '/content'
+            if not os.path.exists(self.output_dir):
+                os.makedirs(self.output_dir)
 
     def track_jupyter_notebook(self):
-        """Track the current Jupyter notebook if running in one."""
+        """Track the current notebook whether it's Colab or regular Jupyter."""
         if self.jupyter_handler.is_running_in_notebook():
-            
-            # Get the current working directory notebooks
-            cwd = Path.cwd()
-            
-            # Try to get notebook path
+            # Get notebook path
             self.notebook_path = self.jupyter_handler.get_notebook_path()
             
             if self.notebook_path:
+                logger.info(f"Found notebook: {self.notebook_path}")
                 self.track_file_access(self.notebook_path)
                 self.track_notebook_files(self.notebook_path)
             else:
-                for nb in Path.cwd().glob('*.ipynb'):
-                    if '.ipynb_checkpoints' not in str(nb):
-                        print(f"   - {nb}")
+                logger.warning("Could not determine notebook path")
+                
+                # For Colab: try to find notebooks in /content directory
+                if self.jupyter_handler.is_running_in_colab():
+                    for nb in Path('/content').glob('*.ipynb'):
+                        if '.ipynb_checkpoints' not in str(nb):
+                            logger.info(f"Found Colab notebook: {nb}")
+                            self.track_file_access(str(nb))
+                            self.track_notebook_files(str(nb))
+
 
     def track_file_access(self, filepath):
         if os.path.exists(filepath):
@@ -335,8 +338,15 @@ class TraceDependencyTracker:
         logger.info(f"Zip file created: {zip_filename}")
         return hash_id, zip_filename
 
-# Main function for creating a zip of unique files
-def zip_list_of_unique_files(filepaths, output_dir):
+def zip_list_of_unique_files(filepaths, output_dir=None):
+    """Create a zip file containing all unique files and their dependencies."""
+    if output_dir is None:
+        # Set default output directory based on environment
+        if JupyterNotebookHandler.is_running_in_colab():
+            output_dir = '/content'
+        else:
+            output_dir = os.getcwd()
+    
     tracker = TraceDependencyTracker(output_dir)
     return tracker.create_zip(filepaths)
 
