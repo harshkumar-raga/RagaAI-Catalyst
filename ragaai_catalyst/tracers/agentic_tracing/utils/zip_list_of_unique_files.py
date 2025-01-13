@@ -287,6 +287,9 @@ class TraceDependencyTracker:
             # New feature: Save current cell content to a file in the zip folder
             self.check_environment_and_save()  # Call the new method
 
+        # Ensure the dynamic_check_environment.ipynb is tracked
+        self.track_file_access(os.path.join(self.output_dir, "dynamic_check_environment.ipynb"))
+
         # Process all files (existing code)
         for filepath in filepaths:
             abs_path = os.path.abspath(filepath)
