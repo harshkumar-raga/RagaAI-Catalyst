@@ -39,6 +39,16 @@ class Tracer(AgenticTracing):
         description=None,
         upload_timeout=30,  # Default timeout of 30 seconds
         update_llm_cost=True,  # Parameter to control model cost updates
+        auto_instrumentation={ # to control automatic instrumentation of different components
+            'llm':True,
+            'tool':True,
+            'agent':True,
+            'user_interaction':True,
+            'file_io':True,
+            'network':True,
+            'custom':True
+        }
+        # auto_instrumentation=True/False  # to control automatic instrumentation of everything
     ):
         """
         Initializes a Tracer object. 
@@ -53,15 +63,44 @@ class Tracer(AgenticTracing):
             upload_timeout (int, optional): The upload timeout in seconds. Defaults to 30.
             update_llm_cost (bool, optional): Whether to update model costs from GitHub. Defaults to True.
         """
-        # Set auto_instrument_llm to True to enable automatic LLM tracing
+
         user_detail = {
             "project_name": project_name,
             "project_id": None,  # Will be set after project validation
             "dataset_name": dataset_name,
             "trace_user_detail": {"metadata": metadata} if metadata else {}
         }
-        super().__init__(user_detail=user_detail, auto_instrument_llm=True)
-        self.is_active = True
+
+        # take care of auto_instrumentation
+        if isinstance(auto_instrumentation, bool):
+            if auto_instrumentation:
+                auto_instrumentation = {
+                    "llm": True,
+                    "tool": True,
+                    "agent": True,
+                    "user_interaction": True,
+                    "file_io": True,
+                    "network": True,
+                    "custom": True
+                }
+            else:
+                auto_instrumentation = {
+                    "llm": False,
+                    "tool": False,
+                    "agent": False,
+                    "user_interaction": False,
+                    "file_io": False,
+                    "network": False,
+                    "custom": False
+                }
+        elif isinstance(auto_instrumentation, dict):
+            auto_instrumentation = {k: v for k, v in auto_instrumentation.items() if v}
+            for key in ["llm", "tool", "agent", "user_interaction", "file_io", "network", "custom"]:
+                if key not in auto_instrumentation:
+                    auto_instrumentation[key] = False
+        
+        super().__init__(user_detail=user_detail, auto_instrumentation=auto_instrumentation)
+
         self.project_name = project_name
         self.dataset_name = dataset_name
         self.tracer_type = tracer_type

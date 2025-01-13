@@ -3,7 +3,7 @@ from datetime import datetime
 import psutil
 import functools
 from typing import Optional, Any, Dict, List
-from ..utils.unique_decorator import generate_unique_hash_simple, mydecorator
+from ..utils.unique_decorator import generate_unique_hash_simple
 import contextvars
 import asyncio
 from ..utils.file_name_tracker import TrackName
@@ -19,6 +19,18 @@ class ToolTracerMixin:
         self.component_user_interaction = {}
         self.gt = None
 
+        # add auto_instrument option
+        self.auto_instrument_tool = False
+        self.auto_instrument_user_interaction = False
+        self.auto_instrument_network = False
+
+    # take care of auto_instrument
+    def instrument_tool_calls(self):
+        self.auto_instrument_tool = True
+    def instrument_user_interaction_calls(self):
+        self.auto_instrument_user_interaction = True
+    def instrument_network_calls(self):
+        self.auto_instrument_network = True
 
     def trace_tool(self, name: str, tool_type: str = "generic", version: str = "1.0.0"):
         def decorator(func):
@@ -27,7 +39,7 @@ class ToolTracerMixin:
                 "name": name,
                 "tool_type": tool_type,
                 "version": version,
-                "is_active": True
+                "is_active": self.is_active
             }
             
             # Check if the function is async
@@ -60,6 +72,9 @@ class ToolTracerMixin:
     def _trace_sync_tool_execution(self, func, name, tool_type, version, *args, **kwargs):
         """Synchronous version of tool tracing"""
         if not self.is_active:
+            return func(*args, **kwargs)
+        
+        if not self.auto_instrument_tool:
             return func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
@@ -134,6 +149,9 @@ class ToolTracerMixin:
         if not self.is_active:
             return await func(*args, **kwargs)
 
+        if not self.auto_instrument_tool:
+            return await func(*args, **kwargs)
+
         start_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
@@ -191,9 +209,14 @@ class ToolTracerMixin:
             raise
 
     def create_tool_component(self, **kwargs):
-        
-
         """Create a tool component according to the data structure"""
+        network_calls = []
+        if self.auto_instrument_network:
+            network_calls = self.component_network_calls.get(kwargs["component_id"], [])
+        interactions = []
+        if self.auto_instrument_user_interaction:
+            interactions = self.component_user_interaction.get(kwargs["component_id"], [])
+
         start_time = kwargs["start_time"]
         component = {
             "id": kwargs["component_id"],
@@ -215,8 +238,8 @@ class ToolTracerMixin:
                 "output": kwargs["output_data"],
                 "memory_used": kwargs["memory_used"]
             },
-            "network_calls": self.component_network_calls.get(kwargs["component_id"], []),
-            "interactions": self.component_user_interaction.get(kwargs["component_id"], [])
+            "network_calls": network_calls,
+            "interactions": interactions
         }
 
         if self.gt: 
