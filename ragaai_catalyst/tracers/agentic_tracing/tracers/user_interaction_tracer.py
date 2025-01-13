@@ -13,7 +13,7 @@ class TracedFile:
 
     def write(self, content: str) -> int:
         self._tracer.trace_file_operation("write", self._file_path, content=content)
-        return 
+        return self._file.write(content)
 
     def read(self, size: Optional[int] = None) -> str:
         content = self._file.read() if size is None else self._file.read(size)

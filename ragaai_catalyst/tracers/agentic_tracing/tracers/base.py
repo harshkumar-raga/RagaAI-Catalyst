@@ -498,8 +498,8 @@ class BaseTracer:
                             })
                             interaction_id += 1
                             
-                        elif "interactions" in child.data:
-                            for interaction in child.data["interactions"]:
+                        if "interactions" in child:
+                            for interaction in child["interactions"]:
                                 interaction["id"] = str(interaction_id)
                                 interactions.append(interaction)
                                 interaction_id += 1
