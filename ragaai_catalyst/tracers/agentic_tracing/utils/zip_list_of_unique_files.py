@@ -116,7 +116,6 @@ class JupyterNotebookHandler:
             except:
                 pass
 
-
             # Try getting notebook path for regular Jupyter
             try:
                 import IPython
@@ -161,7 +160,16 @@ class TraceDependencyTracker:
     def __init__(self, output_dir=None):
         self.tracked_files = set()
         self.python_imports = set()
-        self.notebook_path = None        
+        self.notebook_path = None
+        
+        # Set output directory with Colab handling
+        if JupyterNotebookHandler.is_running_in_colab():
+            self.output_dir = '/content'
+            if not os.path.exists(self.output_dir):
+                os.makedirs(self.output_dir)
+        else:
+            self.output_dir = output_dir or os.getcwd()
+        
         self.jupyter_handler = JupyterNotebookHandler()
 
     def track_jupyter_notebook(self):
@@ -271,14 +279,12 @@ class TraceDependencyTracker:
 
         # Special handling for Colab
         if self.jupyter_handler.is_running_in_colab():
-            logger.info("Running in Google Colab environment")
             # Try to get the Colab notebook path
             colab_notebook = self.jupyter_handler.get_notebook_path()
             if colab_notebook:
                 self.tracked_files.add(os.path.abspath(colab_notebook))
-                logger.info(f"Added Colab notebook to tracked files: {colab_notebook}")
 
-            # New feature: Save current cell content to a file
+            # New feature: Save current cell content to a file in the zip folder
             self.check_environment_and_save()  # Call the new method
 
         # Process all files (existing code)
@@ -332,30 +338,26 @@ class TraceDependencyTracker:
                 try:
                     relative_path = os.path.relpath(filepath, base_path)
                     zipf.write(filepath, relative_path)
+                    logger.info(f"Added to zip: {relative_path}")
                 except Exception as e:
                     logger.warning(f"Could not add {filepath} to zip: {str(e)}")
-
-        logger.info(f"Zip file created successfully at: {zip_filename}")
+        logger.info(f"Zip file created: {zip_filename}")
         return hash_id, zip_filename
 
     def check_environment_and_save(self):
-        """Check if running in Colab and save current cell content."""
+        """Check if running in Colab and save current cell content in the zip folder."""
         try:
             from IPython import get_ipython
             ipython = get_ipython()
             if 'google.colab' in sys.modules:
                 
-                # Create traces directory if it doesn't exist
-                traces_dir = os.path.join(os.getcwd(), 'traces')
-                os.makedirs(traces_dir, exist_ok=True)
-
                 # Retrieve the current cell content dynamically in Colab
                 current_cell = ipython.history_manager.get_range()
                 script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
 
-                # Save the retrieved script content to a file in the traces directory
+                # Save the retrieved script content to a file in the zip folder
                 file_name = "dynamic_check_environment.ipynb"
-                file_path = os.path.join(traces_dir, file_name)
+                file_path = os.path.join(self.output_dir, file_name)  # Save in the zip folder
 
                 with open(file_path, "w") as file:
                     file.write(script_content)
@@ -365,6 +367,13 @@ class TraceDependencyTracker:
             logger.warning(f"Error retrieving the current cell content: {e}")
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
+    """Create a zip file containing all unique files and their dependencies."""
+    if output_dir is None:
+        if JupyterNotebookHandler.is_running_in_colab():
+            output_dir = '/content'
+        else:
+            output_dir = os.getcwd()
+    
     tracker = TraceDependencyTracker(output_dir)
     return tracker.create_zip(filepaths)
 
@@ -375,3 +384,4 @@ if __name__ == "__main__":
     hash_id, zip_path = zip_list_of_unique_files(filepaths)
     print(f"Created zip file: {zip_path}")
     print(f"Hash ID: {hash_id}")
+
