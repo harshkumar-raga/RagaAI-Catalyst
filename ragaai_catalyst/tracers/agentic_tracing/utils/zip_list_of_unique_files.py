@@ -185,6 +185,22 @@ class JupyterNotebookHandler:
             logger.warning(f"Error getting notebook path: {str(e)}")
             return None
 
+class CommandCommenter(ast.NodeTransformer):
+    def visit_Expr(self, node):
+        # Check if the expression is a call to a function that starts with '!'
+        if isinstance(node.value, ast.Call):
+            func_name = getattr(node.value.func, 'id', None)
+            if func_name and (func_name.startswith('!') or func_name in ['pip', 'apt-get', 'curl']):
+                # Comment out the line by returning a comment node
+                return ast.Expr(value=ast.Str(s=f"# {ast.get_source_segment(node)}"))
+        return self.generic_visit(node)
+
+def comment_magic_commands(script_content: str) -> str:
+    tree = ast.parse(script_content)
+    transformer = CommandCommenter()
+    modified_tree = transformer.visit(tree)
+    return ast.unparse(modified_tree)
+
 class TraceDependencyTracker:
     def __init__(self, output_dir=None):
         self.tracked_files = set()
@@ -329,6 +345,8 @@ class TraceDependencyTracker:
             try:
                 with open(abs_path, 'r', encoding='utf-8') as file:
                     content = file.read()
+                    # Comment out magic commands before processing
+                    content = comment_magic_commands(content)
                 self.find_config_files(content, abs_path)
                 if filepath.endswith('.py'):
                     self.analyze_python_imports(abs_path)
