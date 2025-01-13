@@ -371,12 +371,6 @@ class TraceDependencyTracker:
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
-    if output_dir is None:
-        if JupyterNotebookHandler.is_running_in_colab():
-            output_dir = '/content'
-        else:
-            output_dir = os.getcwd()
-    
     tracker = TraceDependencyTracker(output_dir)
     return tracker.create_zip(filepaths)
 
