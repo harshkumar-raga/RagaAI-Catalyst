@@ -397,7 +397,6 @@ class TraceDependencyTracker:
                 # Retrieve the current cell content dynamically in Colab
                 current_cell = ipython.history_manager.get_range()
                 script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
-                script_content = comment_magic_commands(script_content)  # Comment out magic commands
 
                 # Save the retrieved script content to a file in the traces directory
                 file_name = "dynamic_check_environment.py"
@@ -410,22 +409,6 @@ class TraceDependencyTracker:
                 logger.info("Not running on Google Colab.")
         except Exception as e:
             logger.warning(f"Error retrieving the current cell content: {e}")
-
-class CommandCommenter(ast.NodeTransformer):
-    def visit_Expr(self, node):
-        # Check if the expression is a call to a function that starts with '!'
-        if isinstance(node.value, ast.Call):
-            func_name = getattr(node.value.func, 'id', None)
-            if func_name and (func_name.startswith('!') or func_name in ['pip', 'apt-get', 'curl']):
-                # Comment out the line by returning a comment node
-                return ast.Expr(value=ast.Str(s=f"# {ast.get_source_segment(node)}"))
-        return self.generic_visit(node)
-
-def comment_magic_commands(script_content: str) -> str:
-    tree = ast.parse(script_content)
-    transformer = CommandCommenter()
-    modified_tree = transformer.visit(tree)
-    return ast.unparse(modified_tree)
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
