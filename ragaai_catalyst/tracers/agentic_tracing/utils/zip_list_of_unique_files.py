@@ -8,7 +8,21 @@ import json
 import astor
 from pathlib import Path
 import logging
+from IPython import get_ipython
+import ipynbname
 logger = logging.getLogger(__name__)
+
+if 'get_ipython' in locals():
+    ipython_instance = get_ipython()
+    if ipython_instance:
+        ipython_instance.run_line_magic('reset', '-f out')
+
+# Reinitialize logger to ensure it doesn't carry over logs from previous runs
+logger = logging.getLogger(__name__)
+for handler in logger.handlers[:]:  # Remove all old handlers
+    logger.removeHandler(handler)
+logging.basicConfig(level=logging.INFO)  # Set desired logging level
+
 
 # Define the PackageUsageRemover class
 class PackageUsageRemover(ast.NodeTransformer):
@@ -68,12 +82,112 @@ def remove_package_code(source_code: str, package_name: str) -> str:
     except Exception as e:
         raise Exception(f"Error processing source code: {str(e)}")
 
+class JupyterNotebookHandler:
+    @staticmethod
+    def is_running_in_notebook():
+        """Check if the code is running in a Jupyter notebook."""
+        try:
+            shell = get_ipython().__class__.__name__
+            return shell == 'ZMQInteractiveShell'
+        except:
+            return False
+    
+    @staticmethod
+    def get_notebook_path():
+        """Get the path of the current executing Jupyter notebook."""
+        try:
+            import IPython
+            import json
+            from pathlib import Path
+            
+            # Get the IPython instance
+            ipython = IPython.get_ipython()
+            
+            if ipython is None:
+                return None
+            
+            # Get kernel file path
+            if hasattr(ipython, 'kernel') and hasattr(ipython.kernel, 'session'):
+                kernel_file = ipython.kernel.session.config.get('IPKernelApp', {}).get('connection_file', '')
+                if kernel_file:
+                    try:
+                        # Read the kernel file to get more information
+                        with open(kernel_file, 'r') as f:
+                            kernel_info = json.load(f)
+                    except Exception as e:
+                        print(f"Debug: Could not read kernel file: {e}")
+                    
+                    # Get the kernel ID from the file name
+                    kernel_id = Path(kernel_file).stem
+                    
+                    # Look for notebooks in the current directory and its parents
+                    current_dir = Path.cwd()
+                    
+                    # First, try to find notebooks that are currently being edited
+                    notebooks = list(current_dir.glob('*.ipynb'))
+                    
+                    if notebooks:
+                        # First, try to match notebooks modified in the last hour
+                        import time
+                        current_time = time.time()
+                        recent_notebooks = [
+                            nb for nb in notebooks 
+                            if os.path.getmtime(nb) > current_time - 3600  # Last hour
+                            and '.ipynb_checkpoints' not in str(nb)
+                        ]
+                        
+                        if recent_notebooks:
+                            # Get the most recently modified notebook
+                            current_notebook = max(recent_notebooks, key=os.path.getmtime)
+                            return str(current_notebook)
+                            
+                        # If no recently modified notebooks, try reading each notebook
+                        # to find one with matching kernel info
+                        for notebook in notebooks:
+                            if '.ipynb_checkpoints' in str(notebook):
+                                continue
+                            try:
+                                with open(notebook, 'r', encoding='utf-8') as f:
+                                    nb_content = json.load(f)
+                                    if 'metadata' in nb_content and 'kernelspec' in nb_content['metadata']:
+                                        return str(notebook)
+                            except Exception as e:
+                                print(f"Debug: Error reading notebook {notebook}: {e}")
+                    
+                    return None
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+        
+        return None
+
+
 # TraceDependencyTracker class
 class TraceDependencyTracker:
     def __init__(self, output_dir=None):
         self.tracked_files = set()
         self.python_imports = set()
         self.output_dir = output_dir or os.getcwd()
+        self.jupyter_handler = JupyterNotebookHandler()
+
+    def track_jupyter_notebook(self):
+        """Track the current Jupyter notebook if running in one."""
+        if self.jupyter_handler.is_running_in_notebook():
+            
+            # Get the current working directory notebooks
+            cwd = Path.cwd()
+            
+            # Try to get notebook path
+            self.notebook_path = self.jupyter_handler.get_notebook_path()
+            
+            if self.notebook_path:
+                self.track_file_access(self.notebook_path)
+                self.track_notebook_files(self.notebook_path)
+            else:
+                for nb in Path.cwd().glob('*.ipynb'):
+                    if '.ipynb_checkpoints' not in str(nb):
+                        print(f"   - {nb}")
 
     def track_file_access(self, filepath):
         if os.path.exists(filepath):
@@ -104,6 +218,31 @@ class TraceDependencyTracker:
                     except (UnicodeDecodeError, IOError):
                         pass
 
+    def track_notebook_files(self, notebook_path):
+        """Track all files used in the Jupyter notebook."""
+        try:
+            with open(notebook_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            self.find_config_files(content, notebook_path)  # Find and track config files
+            
+            # Track PDF files dynamically
+            pdf_pattern = r'\"([^\"]+\.pdf)\"'  # Regex to find PDF file paths
+            matches = re.finditer(pdf_pattern, content)
+            for match in matches:
+                pdf_filepath = match.group(1)
+                self.track_file_access(pdf_filepath)  # Track the PDF file
+
+            # Track other file types if needed (e.g., images, text files)
+            other_file_pattern = r'\"([^\"]+\.(pdf|txt|png|jpg|jpeg|csv))\"'  # Extend as needed
+            other_matches = re.finditer(other_file_pattern, content)
+            for match in other_matches:
+                other_filepath = match.group(1)
+                self.track_file_access(other_filepath)  # Track other files
+
+        except Exception as e:
+            print(f"Warning: Could not read notebook {notebook_path}: {str(e)}")
+
+
     def analyze_python_imports(self, filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as file:
@@ -125,6 +264,13 @@ class TraceDependencyTracker:
             print(f"Warning: Could not analyze imports in {filepath}: {str(e)}")
 
     def create_zip(self, filepaths):
+        self.track_jupyter_notebook()
+
+        # Check if output directory exists
+        if not os.path.exists(self.output_dir):
+            logger.warning(f"Output directory does not exist: {self.output_dir}")
+            return None, None
+
         for filepath in filepaths:
             abs_path = os.path.abspath(filepath)
             self.track_file_access(abs_path)
@@ -135,10 +281,14 @@ class TraceDependencyTracker:
                 if filepath.endswith('.py'):
                     self.analyze_python_imports(abs_path)
             except Exception as e:
-                print(f"Warning: Could not process {filepath}: {str(e)}")
+                logger.warning(f"Could not process {filepath}: {str(e)}")
 
         self.tracked_files.update(self.python_imports)
         hash_contents = []
+
+        if self.notebook_path:
+            self.tracked_files.add(os.path.abspath(self.notebook_path))
+
         for filepath in sorted(self.tracked_files):
             if 'env' in filepath:
                 continue
@@ -150,7 +300,7 @@ class TraceDependencyTracker:
                         content = remove_package_code(content.decode('utf-8'), 'ragaai_catalyst').encode('utf-8')
                     hash_contents.append(content)
             except Exception as e:
-                print(f"Warning: Could not read {filepath} for hash calculation: {str(e)}")
+                logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
 
         combined_content = b''.join(hash_contents)
         hash_id = hashlib.sha256(combined_content).hexdigest()
@@ -158,7 +308,7 @@ class TraceDependencyTracker:
         zip_filename = os.path.join(self.output_dir, f'{hash_id}.zip')
         common_path = [os.path.abspath(p) for p in self.tracked_files if 'env' not in p]
 
-        if common_path!=[]:
+        if common_path != []:
             base_path = os.path.commonpath(common_path)
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for filepath in sorted(self.tracked_files):
@@ -167,10 +317,22 @@ class TraceDependencyTracker:
                 try:
                     relative_path = os.path.relpath(filepath, base_path)
                     zipf.write(filepath, relative_path)
-                    # logger.info(f"Added to zip: {relative_path}")
+                    logger.info(f"Added to zip: {relative_path}")
                 except Exception as e:
-                    print(f"Warning: Could not add {filepath} to zip: {str(e)}")
+                    logger.warning(f"Could not add {filepath} to zip: {str(e)}")
 
+            # Add the notebook path to the tracked files if it exists
+            notebook_path = self.jupyter_handler.get_notebook_path()
+            if notebook_path:
+                self.track_file_access(notebook_path)
+                logger.info(f"Notebook path tracked: {notebook_path}")
+                try:
+                    zipf.write(notebook_path, os.path.basename(notebook_path))
+                    logger.info(f"Added notebook to zip: {notebook_path}")
+                except Exception as e:
+                    logger.warning(f"Could not add notebook {notebook_path} to zip: {str(e)}")
+
+        logger.info(f"Zip file created: {zip_filename}")
         return hash_id, zip_filename
 
 # Main function for creating a zip of unique files
