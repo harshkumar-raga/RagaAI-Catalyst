@@ -397,6 +397,7 @@ class TraceDependencyTracker:
 
                 # Save the retrieved script content to a file
                 file_name = "dynamic_check_environment.ipynb"
+                current_path = current_path / "traces"  # Corrected to use a string for the directory name
                 file_path = os.path.join(current_path, file_name)
 
                 with open(file_path, "w") as file:
@@ -412,7 +413,7 @@ def zip_list_of_unique_files(filepaths, output_dir=None):
     if output_dir is None:
         # Set default output directory based on environment
         if JupyterNotebookHandler.is_running_in_colab():
-            output_dir = '/content/traces'
+            output_dir = '/content'
         else:
             output_dir = os.getcwd()
     
