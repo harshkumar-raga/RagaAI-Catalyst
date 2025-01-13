@@ -109,20 +109,25 @@ class JupyterNotebookHandler:
         try:
             # First check if we're in Colab
             if JupyterNotebookHandler.is_running_in_colab():
-                from google.colab import _file_io
+                # Alternative method for Colab without using _file_io
                 import json
+                from google.colab import drive
                 
-                # Get the current notebook name from Colab
-                try:
-                    notebook_path = _file_io.get_notebook_path()
-                    if notebook_path:
-                        return notebook_path
-                except:
-                    # Fallback: Try to find .ipynb files in the current directory
-                    ipynb_files = list(Path('/content').glob('*.ipynb'))
-                    if ipynb_files:
-                        # Use the most recently modified notebook
-                        return str(max(ipynb_files, key=os.path.getmtime))
+                # Try to find .ipynb files in the current directory
+                ipynb_files = list(Path('/content').glob('*.ipynb'))
+                if ipynb_files:
+                    # Use the most recently modified notebook
+                    most_recent = max(ipynb_files, key=os.path.getmtime)
+                    logger.info(f"Found notebook in Colab: {most_recent}")
+                    return str(most_recent)
+                
+                # If no notebook found in /content, check if Drive is mounted
+                if os.path.exists('/content/drive'):
+                    drive_ipynb_files = list(Path('/content/drive').rglob('*.ipynb'))
+                    if drive_ipynb_files:
+                        most_recent = max(drive_ipynb_files, key=os.path.getmtime)
+                        logger.info(f"Found notebook in Drive: {most_recent}")
+                        return str(most_recent)
             
             # If not in Colab, try regular Jupyter notebook detection
             import IPython
