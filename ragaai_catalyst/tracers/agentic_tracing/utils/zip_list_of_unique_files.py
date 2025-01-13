@@ -10,6 +10,7 @@ from pathlib import Path
 import logging
 from IPython import get_ipython
 import ipynbname
+import sys
 logger = logging.getLogger(__name__)
 
 if 'get_ipython' in locals():
@@ -318,6 +319,9 @@ class TraceDependencyTracker:
                 self.tracked_files.add(os.path.abspath(colab_notebook))
                 logger.info(f"Added Colab notebook to tracked files: {colab_notebook}")
 
+            # New feature: Save current cell content to a file
+            self.check_environment_and_save()  # Call the new method
+
         # Process all files (existing code)
         for filepath in filepaths:
             abs_path = os.path.abspath(filepath)
@@ -376,6 +380,32 @@ class TraceDependencyTracker:
 
         logger.info(f"Zip file created successfully at: {zip_filename}")
         return hash_id, zip_filename
+
+    def check_environment_and_save(self):
+        """Check if running in Colab and save current cell content."""
+        try:
+            from IPython import get_ipython
+            ipython = get_ipython()
+            if 'google.colab' in sys.modules:
+                logger.info("Running on Google Colab.")
+                current_path = self.output_dir  # Save in the output directory
+                logger.info("Current path for saving:", current_path)
+
+                # Retrieve the current cell content dynamically in Colab
+                current_cell = ipython.history_manager.get_range()
+                script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
+
+                # Save the retrieved script content to a file
+                file_name = "dynamic_check_environment.ipynb"
+                file_path = os.path.join(current_path, file_name)
+
+                with open(file_path, "w") as file:
+                    file.write(script_content)
+                logger.info(f"Script saved successfully at: {file_path}")
+            else:
+                logger.info("Not running on Google Colab.")
+        except Exception as e:
+            logger.warning(f"Error retrieving the current cell content: {e}")
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
