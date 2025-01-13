@@ -21,7 +21,6 @@ class TracedFile:
         return content
 
     def close(self) -> None:
-        self._tracer.trace_file_operation("close", self._file_path)
         return self._file.close()
 
     def __enter__(self):
@@ -75,13 +74,25 @@ class UserInteractionTracer:
 
     def traced_open(self, file: str, mode: str = 'r', *args, **kwargs):
         file_obj = self.original_open(file, mode, *args, **kwargs)
-        self.trace_file_operation("open", file)
         return TracedFile(file_obj, file, self)
 
     def trace_file_operation(self, operation: str, file_path: str, **kwargs):
+        interaction_type = f"file_{operation}"
+        
+        # Check for existing interaction with same file_path and operation
+        for existing in reversed(self.interactions):
+            if (existing.get("file_path") == file_path and 
+                existing.get("interaction_type") == interaction_type):
+                # Merge content if it exists
+                if "content" in kwargs and "content" in existing:
+                    existing["content"] += kwargs["content"]
+                    return
+                break
+        
+        # If no matching interaction found or couldn't merge, create new one
         interaction = {
             "id": str(uuid.uuid4()),
-            "interaction_type": f"file_{operation}",
+            "interaction_type": interaction_type,
             "file_path": file_path,
             "timestamp": datetime.now().isoformat()
         }
