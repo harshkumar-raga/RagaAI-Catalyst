@@ -399,10 +399,12 @@ class BaseTracer:
                 # Add agent_start interaction
                 interactions.append({
                     "id": str(interaction_id),
+                    "span_id": span.id,
                     "interaction_type": "agent_start",
                     "name": span.name,
-                    "content": span.data.get("input"),
+                    "content": None,
                     "timestamp": span.start_time,
+                    "error": span.error
                 })
                 interaction_id += 1
 
@@ -410,51 +412,58 @@ class BaseTracer:
                 if "interactions" in span.data:
                     for interaction in span.data["interactions"]:
                         interaction["id"] = str(interaction_id)
+                        interaction["span_id"] = span.id
+                        interaction["error"] = span.error
                         interactions.append(interaction)
                         interaction_id += 1
 
                 # Process children of agent
                 if "children" in span.data:
                     for child in span.data["children"]:
+                        import pdb; pdb.set_trace()
                         child_type = child.get("type")
                         
                         if child_type == "tool":
                             # Tool call start
                             interactions.append({
                                 "id": str(interaction_id),
+                                "span_id": child.get("id"),
                                 "interaction_type": "tool_call_start",
                                 "name": child.get("name"),
                                 "content": {
-                                    "input": child.get("data", {}).get("input"),
-                                    "output": None
+                                    "parameters": [child.get("data", {}).get("input")]
                                 },
                                 "timestamp": child.get("start_time"),
+                                "error": child.get('error')
                             })
                             interaction_id += 1
 
                             # Tool call end
                             interactions.append({
                                 "id": str(interaction_id),
+                                "span_id": child.get("id"),
                                 "interaction_type": "tool_call_end",
                                 "name": child.get("name"),
                                 "content": {
-                                    "input": None,
-                                    "output": child.get("data", {}).get("output")
+                                   "returns": child.get("data", {}).get("output"),
                                 },
                                 "timestamp": child.get("end_time"),
+                                "error": child.get('error')
                             })
                             interaction_id += 1
 
                         elif child_type == "llm":
                             interactions.append({
                                 "id": str(interaction_id),
+                                "span_id": child.get("id"),
                                 "interaction_type": "llm_call",
                                 "name": child.get("name"),
                                 "content": {
-                                    "input": child.get("data", {}).get("input"),
-                                    "output": child.get("data", {}).get("output")
+                                    "prompt": child.get("data", {}).get("input"),
+                                    "response": child.get("data", {}).get("output")
                                 },
                                 "timestamp": child.get("start_time"),
+                                "error": child.get('error')
                             })
                             interaction_id += 1
 
@@ -469,25 +478,23 @@ class BaseTracer:
 
                             interactions.append({
                                 "id": str(interaction_id),
+                                "span_id": child.get("id"),
                                 "interaction_type": interaction_type,
                                 "name": None,
                                 "content": {
-                                    "input": {
-                                        "file_path": child.get("data", {}).get("path"),
-                                        "mode": child.get("data", {}).get("mode")
-                                    },
-                                    "output": {
-                                        "bytes_count": child.get("data", {}).get("bytes_count"),
-                                        "content": child.get("data", {}).get("content")
-                                    }
+                                    "file_path": child.get("data", {}).get("path"),
+                                    "mode": child.get("data", {}).get("mode"),
+                                    "content": child.get("data", {}).get("content")
                                 },
                                 "timestamp": child.get("start_time"),
+                                "error": child.get('error')
                             })
                             interaction_id += 1
 
                         elif child_type == "network":
                             interactions.append({
                                 "id": str(interaction_id),
+                                "span_id": child.get("id"),
                                 "interaction_type": "network_call",
                                 "name": child.get("name"),
                                 "content": {
@@ -495,22 +502,27 @@ class BaseTracer:
                                     "response": child.get("data", {}).get("response")
                                 },
                                 "timestamp": child.get("start_time"),
+                                "error": child.get('error')
                             })
                             interaction_id += 1
                             
                         if "interactions" in child:
                             for interaction in child["interactions"]:
                                 interaction["id"] = str(interaction_id)
+                                interaction["span_id"] = child.get("id")
+                                interaction["error"] = None
                                 interactions.append(interaction)
                                 interaction_id += 1
 
                 # Add agent_end interaction
                 interactions.append({
                     "id": str(interaction_id),
+                    "span_id": span.id,
                     "interaction_type": "agent_end",
                     "name": span.name,
                     "content": span.data.get("output"),
                     "timestamp": span.end_time,
+                    "error": span.error
                 })
                 interaction_id += 1
 
