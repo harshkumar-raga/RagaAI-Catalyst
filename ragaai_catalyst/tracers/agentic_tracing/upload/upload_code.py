@@ -3,6 +3,7 @@ import requests
 import json
 import os
 import logging
+from ragaai_catalyst.ragaai_catalyst import RagaAICatalyst
 logger = logging.getLogger(__name__)
 
 def upload_code(hash_id, zip_path, project_name, dataset_name):
@@ -26,7 +27,7 @@ def _fetch_dataset_code_hashes(project_name, dataset_name):
 
     try:
         response = requests.request("GET", 
-                                    f"{os.getenv('RAGAAI_CATALYST_BASE_URL')}/v2/llm/dataset/code?datasetName={dataset_name}", 
+                                    f"{RagaAICatalyst.BASE_URL}/v2/llm/dataset/code?datasetName={dataset_name}", 
                                     headers=headers, 
                                     data=payload,
                                     timeout=99999)
@@ -54,7 +55,7 @@ def _fetch_presigned_url(project_name, dataset_name):
 
     try:
         response = requests.request("GET", 
-                                    f"{os.getenv('RAGAAI_CATALYST_BASE_URL')}/v1/llm/presigned-url", 
+                                    f"{RagaAICatalyst.BASE_URL}/v1/llm/presigned-url", 
                                     headers=headers, 
                                     data=payload,
                                     timeout=99999)
@@ -102,7 +103,7 @@ def _insert_code(dataset_name, hash_id, presigned_url, project_name):
     
     try:
         response = requests.request("POST", 
-                                    f"{os.getenv('RAGAAI_CATALYST_BASE_URL')}/v2/llm/dataset/code", 
+                                    f"{RagaAICatalyst.BASE_URL}/v2/llm/dataset/code", 
                                     headers=headers, 
                                     data=payload,
                                     timeout=99999)
