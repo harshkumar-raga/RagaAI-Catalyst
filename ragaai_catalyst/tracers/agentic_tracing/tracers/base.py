@@ -9,7 +9,7 @@ from typing import List
 import uuid
 import sys
 import tempfile
-
+from ....ragaai_catalyst import RagaAICatalyst
 from ..data.data_structure import (
     Trace, Metadata, SystemInfo, OSInfo, EnvironmentInfo,
     Resources, CPUResource, MemoryResource, DiskResource, NetworkResource,
@@ -203,7 +203,7 @@ class BaseTracer:
             project_id = self.project_id 
             dataset_name = self.dataset_name
             user_detail = self.user_details
-            base_url = os.getenv('RAGAAI_CATALYST_BASE_URL')
+            base_url = RagaAICatalyst.BASE_URL
             upload_traces = UploadAgenticTraces(
                 json_file_path=json_file_path,
                 project_name=project_name,
