@@ -112,7 +112,7 @@ class JupyterNotebookHandler:
             try:
                 notebook_path = ipynbname.path()
                 if notebook_path:
-                    logger.info(f"Found notebook using ipynbname: {notebook_path}")
+                    # logger.info(f"Found notebook using ipynbname: {notebook_path}")
                     return str(notebook_path)
             except:
                 pass
@@ -123,13 +123,13 @@ class JupyterNotebookHandler:
                     from google.colab import drive
                     if not os.path.exists('/content/drive'):
                         drive.mount('/content/drive')
-                        logger.info("Google Drive mounted successfully")
+                        # logger.info("Google Drive mounted successfully")
 
                     # Look for notebooks in /content first
                     ipynb_files = list(Path('/content').glob('*.ipynb'))
                     if ipynb_files:
                         current_nb = max(ipynb_files, key=os.path.getmtime)
-                        logger.info(f"Found current Colab notebook: {current_nb}")
+                        # logger.info(f"Found current Colab notebook: {current_nb}")
                         return str(current_nb)
                         
                     # Then check Drive if mounted
@@ -137,7 +137,7 @@ class JupyterNotebookHandler:
                         drive_ipynb_files = list(Path('/content/drive').rglob('*.ipynb'))
                         if drive_ipynb_files:
                             current_nb = max(drive_ipynb_files, key=os.path.getmtime)
-                            logger.info(f"Found Colab notebook in Drive: {current_nb}")
+                            # logger.info(f"Found Colab notebook in Drive: {current_nb}")
                             return str(current_nb)
                 except Exception as e:
                     logger.warning(f"Error in Colab notebook detection: {str(e)}")
@@ -164,25 +164,24 @@ class JupyterNotebookHandler:
                                 
                                 if recent_notebooks:
                                     notebook_path = str(max(recent_notebooks, key=os.path.getmtime))
-                                    logger.info(f"Found Jupyter notebook: {notebook_path}")
+                                    # logger.info(f"Found Jupyter notebook: {notebook_path}")
                                     return notebook_path
 
                     # Try alternative method using notebook metadata
                     try:
                         notebook_path = ipython.kernel._parent_ident
                         if notebook_path:
-                            logger.info(f"Found notebook using kernel parent ident: {notebook_path}")
+                            # logger.info(f"Found notebook using kernel parent ident: {notebook_path}")
                             return notebook_path
                     except:
                         pass
 
             except Exception as e:
-                logger.warning(f"Error in Jupyter notebook detection: {str(e)}")
-
-            return None
+                # logger.warning(f"Error in Jupyter notebook detection: {str(e)}")
+                return None
             
         except Exception as e:
-            logger.warning(f"Error getting notebook path: {str(e)}")
+            # logger.warning(f"Error getting notebook path: {str(e)}")
             return None
 
 
@@ -250,7 +249,6 @@ class TraceDependencyTracker:
             notebook_path = self.jupyter_handler.get_notebook_path()
             
             if notebook_path:
-                logger.info(f"Found notebook to track: {notebook_path}")
                 self.notebook_path = notebook_path
                 self.track_file_access(notebook_path)
                 
@@ -261,8 +259,6 @@ class TraceDependencyTracker:
                         notebook_content = comment_magic_commands(notebook_content)
                         # Find and track imported files
                         self.find_config_files(notebook_content, notebook_path)
-                        # Track any additional dependencies
-                        self.track_notebook_files(notebook_path)
                 except Exception as e:
                     logger.warning(f"Error processing notebook dependencies: {str(e)}")
             else:
@@ -298,29 +294,29 @@ class TraceDependencyTracker:
                     except (UnicodeDecodeError, IOError):
                         pass
 
-    def track_notebook_files(self, notebook_path):
-        """Track all files used in the Jupyter notebook."""
-        try:
-            with open(notebook_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            self.find_config_files(content, notebook_path)  # Find and track config files
+    # def track_notebook_files(self, notebook_path):
+    #     """Track all files used in the Jupyter notebook."""
+    #     try:
+    #         with open(notebook_path, 'r', encoding='utf-8') as f:
+    #             content = f.read()
+    #         self.find_config_files(content, notebook_path)  # Find and track config files
             
-            # Track PDF files dynamically
-            pdf_pattern = r'\"([^\"]+\.pdf)\"'  # Regex to find PDF file paths
-            matches = re.finditer(pdf_pattern, content)
-            for match in matches:
-                pdf_filepath = match.group(1)
-                self.track_file_access(pdf_filepath)  # Track the PDF file
+    #         # Track PDF files dynamically
+    #         pdf_pattern = r'\"([^\"]+\.pdf)\"'  # Regex to find PDF file paths
+    #         matches = re.finditer(pdf_pattern, content)
+    #         for match in matches:
+    #             pdf_filepath = match.group(1)
+    #             self.track_file_access(pdf_filepath)  # Track the PDF file
 
-            # Track other file types if needed (e.g., images, text files)
-            other_file_pattern = r'\"([^\"]+\.(pdf|txt|png|jpg|jpeg|csv))\"'  # Extend as needed
-            other_matches = re.finditer(other_file_pattern, content)
-            for match in other_matches:
-                other_filepath = match.group(1)
-                self.track_file_access(other_filepath)  # Track other files
+    #         # Track other file types if needed (e.g., images, text files)
+    #         other_file_pattern = r'\"([^\"]+\.(pdf|txt|png|jpg|jpeg|csv))\"'  # Extend as needed
+    #         other_matches = re.finditer(other_file_pattern, content)
+    #         for match in other_matches:
+    #             other_filepath = match.group(1)
+    #             self.track_file_access(other_filepath)  # Track other files
 
-        except Exception as e:
-            print(f"Warning: Could not read notebook {notebook_path}: {str(e)}")
+    #     except Exception as e:
+    #         print(f"Warning: Could not read notebook {notebook_path}: {str(e)}")
 
 
     def analyze_python_imports(self, filepath):
@@ -346,11 +342,11 @@ class TraceDependencyTracker:
 
     def create_zip(self, filepaths):
         self.track_jupyter_notebook()
-        logger.info("Tracked Jupyter notebook and its dependencies")
+        # logger.info("Tracked Jupyter notebook and its dependencies")
 
         # Ensure output directory exists
         os.makedirs(self.output_dir, exist_ok=True)
-        logger.info(f"Using output directory: {self.output_dir}")
+        # logger.info(f"Using output directory: {self.output_dir}")
 
         # Special handling for Colab
         if self.jupyter_handler.is_running_in_colab():
@@ -394,6 +390,10 @@ class TraceDependencyTracker:
                             cell_contents.append(commented_source)
 
                     notebook_content_str = '\n\n'.join(cell_contents)
+                    notebook_abs_path = os.path.abspath(self.notebook_path)
+                    if notebook_abs_path in self.tracked_files:
+                        self.tracked_files.remove(notebook_abs_path)
+
             except Exception as e:
                 logger.warning(f"Error processing notebook dependencies: {str(e)}")
 
@@ -412,7 +412,9 @@ class TraceDependencyTracker:
                         content = comment_magic_commands(content)
                     hash_contents.append(content)
             except Exception as e:
-                logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
+                # logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
+                logger.info("saving")
+
 
         if notebook_content_str:
             hash_contents.append(notebook_content_str.encode('utf-8'))
@@ -440,7 +442,7 @@ class TraceDependencyTracker:
                 try:
                     relative_path = os.path.relpath(filepath, base_path)
                     zipf.write(filepath, relative_path)
-                    logger.info(f"Added to zip: {relative_path}")
+                    logger.info(f"Added python script to zip: {relative_path}")
                 except Exception as e:
                     logger.warning(f"Could not add {filepath} to zip: {str(e)}")
 
@@ -450,43 +452,13 @@ class TraceDependencyTracker:
                 logger.info(f"Added notebook content to zip as: {py_filename}")
 
             if self.colab_content:
-                colab_filename = "colab_current_cell.py"
+                colab_filename = "colab_file.py"
                 zipf.writestr(colab_filename, self.colab_content)
                 logger.info(f"Added Colab cell content to zip as: {colab_filename}")
 
 
         logger.info(f"Zip file created successfully at: {zip_filename}")
         return hash_id, zip_filename
-
-    # def check_environment_and_save(self):
-    #     """Check if running in Colab and save current cell content."""
-    #     try:
-    #         from IPython import get_ipython
-    #         ipython = get_ipython()
-    #         if 'google.colab' in sys.modules:
-    #             logger.info("Running on Google Colab.")
-                
-    #             # Create traces directory if it doesn't exist
-    #             traces_dir = os.path.join(os.getcwd(), 'traces')
-    #             os.makedirs(traces_dir, exist_ok=True)
-    #             logger.info("Current path for saving:", traces_dir)
-
-    #             # Retrieve the current cell content dynamically in Colab
-    #             current_cell = ipython.history_manager.get_range()
-    #             script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
-    #             script_content = comment_magic_commands(script_content)  # Comment out magic commands
-
-    #             # Save the retrieved script content to a file in the traces directory
-    #             file_name = "dynamic_check_environment.py"
-    #             file_path = os.path.join(traces_dir, file_name)
-
-    #             with open(file_path, "w") as file:
-    #                 file.write(script_content)
-    #             logger.info(f"Script saved successfully at: {file_path}")
-    #         else:
-    #             logger.info("Not running on Google Colab.")
-    #     except Exception as e:
-    #         logger.warning(f"Error retrieving the current cell content: {e}")
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
