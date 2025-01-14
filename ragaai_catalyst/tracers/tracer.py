@@ -33,6 +33,7 @@ class Tracer(AgenticTracing):
         self,
         project_name,
         dataset_name,
+        trace_name=None,
         tracer_type=None,
         pipeline=None,
         metadata=None,
@@ -49,6 +50,7 @@ class Tracer(AgenticTracing):
             'custom':True
         }
         # auto_instrumentation=True/False  # to control automatic instrumentation of everything
+
     ):
         """
         Initializes a Tracer object. 
@@ -68,6 +70,7 @@ class Tracer(AgenticTracing):
             "project_name": project_name,
             "project_id": None,  # Will be set after project validation
             "dataset_name": dataset_name,
+            "trace_name": trace_name if trace_name else f"trace_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}",
             "trace_user_detail": {"metadata": metadata} if metadata else {}
         }
 
