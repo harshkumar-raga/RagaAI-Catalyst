@@ -421,7 +421,6 @@ class BaseTracer:
                 if "children" in span.data:
                     for child in span.data["children"]:
                         child_type = child.get("type")
-                        
                         if child_type == "tool":
                             # Tool call start
                             interactions.append({
@@ -430,7 +429,10 @@ class BaseTracer:
                                 "interaction_type": "tool_call_start",
                                 "name": child.get("name"),
                                 "content": {
-                                    "parameters": [child.get("data", {}).get("input")]
+                                    "parameters": [
+                                        child.get("data", {}).get("input").get('args'),
+                                        child.get("data", {}).get("input").get('kwargs')
+                                    ]
                                 },
                                 "timestamp": child.get("start_time"),
                                 "error": child.get('error')
