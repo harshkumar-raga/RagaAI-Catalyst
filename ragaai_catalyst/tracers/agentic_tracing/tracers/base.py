@@ -420,7 +420,6 @@ class BaseTracer:
                 # Process children of agent
                 if "children" in span.data:
                     for child in span.data["children"]:
-                        import pdb; pdb.set_trace()
                         child_type = child.get("type")
                         
                         if child_type == "tool":
