@@ -177,6 +177,10 @@ class BaseTracer:
             self.trace = self._change_agent_input_output(self.trace)
             self.trace = self._extract_cost_tokens(self.trace)
             
+            # Format interactions and add to trace
+            interactions = self.format_interactions()
+            self.trace.interactions = interactions["interactions"]
+            
             # Create traces directory if it doesn't exist
             self.traces_dir = tempfile.gettempdir()
             filename = self.trace.id + ".json"
@@ -369,3 +373,152 @@ class BaseTracer:
                 data['spans'] = deduplicate_spans(data['spans'])
         
         return trace
+
+    def format_interactions(self) -> dict:
+        """
+        Format interactions from trace data into a standardized format.
+        Returns a dictionary containing formatted interactions based on trace data.
+
+        The function processes spans from self.trace and formats them into interactions
+        of various types including: agent_start, agent_end, input, output, tool_call_start,
+        tool_call_end, llm_call, file_read, file_write, network_call.
+
+        Returns:
+            dict: A dictionary with "interactions" key containing a list of interactions
+                  sorted by timestamp.
+        """
+        interactions = []
+        interaction_id = 1
+
+        if not hasattr(self, 'trace') or not self.trace.data:
+            return {"interactions": []}
+
+        for span in self.trace.data[0]["spans"]:
+            # Process agent spans
+            if span.type == "agent":
+                # Add agent_start interaction
+                interactions.append({
+                    "id": str(interaction_id),
+                    "interaction_type": "agent_start",
+                    "name": span.name,
+                    "content": span.data.get("input"),
+                    "timestamp": span.start_time,
+                })
+                interaction_id += 1
+
+                # Process interactions from span.data if they exist
+                if "interactions" in span.data:
+                    for interaction in span.data["interactions"]:
+                        interaction["id"] = str(interaction_id)
+                        interactions.append(interaction)
+                        interaction_id += 1
+
+                # Process children of agent
+                if "children" in span.data:
+                    for child in span.data["children"]:
+                        child_type = child.get("type")
+                        
+                        if child_type == "tool":
+                            # Tool call start
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "interaction_type": "tool_call_start",
+                                "name": child.get("name"),
+                                "content": {
+                                    "input": child.get("data", {}).get("input"),
+                                    "output": None
+                                },
+                                "timestamp": child.get("start_time"),
+                            })
+                            interaction_id += 1
+
+                            # Tool call end
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "interaction_type": "tool_call_end",
+                                "name": child.get("name"),
+                                "content": {
+                                    "input": None,
+                                    "output": child.get("data", {}).get("output")
+                                },
+                                "timestamp": child.get("end_time"),
+                            })
+                            interaction_id += 1
+
+                        elif child_type == "llm":
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "interaction_type": "llm_call",
+                                "name": child.get("name"),
+                                "content": {
+                                    "input": child.get("data", {}).get("input"),
+                                    "output": child.get("data", {}).get("output")
+                                },
+                                "timestamp": child.get("start_time"),
+                            })
+                            interaction_id += 1
+
+                        elif child_type == "file":
+                            operation = child.get("data", {}).get("operation")
+                            if operation == "read":
+                                interaction_type = "file_read"
+                            elif operation == "write":
+                                interaction_type = "file_write"
+                            else:
+                                continue
+
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "interaction_type": interaction_type,
+                                "name": None,
+                                "content": {
+                                    "input": {
+                                        "file_path": child.get("data", {}).get("path"),
+                                        "mode": child.get("data", {}).get("mode")
+                                    },
+                                    "output": {
+                                        "bytes_count": child.get("data", {}).get("bytes_count"),
+                                        "content": child.get("data", {}).get("content")
+                                    }
+                                },
+                                "timestamp": child.get("start_time"),
+                            })
+                            interaction_id += 1
+
+                        elif child_type == "network":
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "interaction_type": "network_call",
+                                "name": child.get("name"),
+                                "content": {
+                                    "request": child.get("data", {}).get("request"),
+                                    "response": child.get("data", {}).get("response")
+                                },
+                                "timestamp": child.get("start_time"),
+                            })
+                            interaction_id += 1
+                            
+                        if "interactions" in child:
+                            for interaction in child["interactions"]:
+                                interaction["id"] = str(interaction_id)
+                                interactions.append(interaction)
+                                interaction_id += 1
+
+                # Add agent_end interaction
+                interactions.append({
+                    "id": str(interaction_id),
+                    "interaction_type": "agent_end",
+                    "name": span.name,
+                    "content": span.data.get("output"),
+                    "timestamp": span.end_time,
+                })
+                interaction_id += 1
+
+        # Sort interactions by timestamp
+        sorted_interactions = sorted(interactions, key=lambda x: x["timestamp"] if x["timestamp"] else "")
+
+        # Reassign IDs to maintain sequential order after sorting
+        for idx, interaction in enumerate(sorted_interactions, 1):
+            interaction["id"] = str(idx)
+
+        return {"interactions": sorted_interactions}

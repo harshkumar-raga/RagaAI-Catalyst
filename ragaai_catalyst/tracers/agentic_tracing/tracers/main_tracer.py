@@ -81,6 +81,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         self.user_interaction_tracer.component_id.set(self.current_component_id.get())
         builtins.print = self.user_interaction_tracer.traced_print
         builtins.input = self.user_interaction_tracer.traced_input
+        builtins.open = self.user_interaction_tracer.traced_open
         
         # Start base tracer (includes system info and resource monitoring)
         super().start()
@@ -99,6 +100,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
             # Restore original print and input functions
             builtins.print = self.user_interaction_tracer.original_print
             builtins.input = self.user_interaction_tracer.original_input
+            builtins.open = self.user_interaction_tracer.original_open
             
             # Calculate final metrics before stopping
             self._calculate_final_metrics()
