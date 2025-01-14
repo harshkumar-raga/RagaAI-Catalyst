@@ -24,6 +24,7 @@ from ..utils.llm_utils import (
 from ..utils.trace_utils import load_model_costs
 from ..utils.unique_decorator import generate_unique_hash_simple   
 from ..utils.file_name_tracker import TrackName
+from ..utils.span_attributes import SpanAttributes
 
 
 class LLMTracerMixin:
@@ -486,7 +487,19 @@ class LLMTracerMixin:
             self.add_component(llm_component, is_error=True)
             raise
 
-    def trace_llm(self, name: str = None):
+    def trace_llm(self, name: str = None, tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
+        if name not in self.span_attributes_dict:
+            self.span_attributes_dict[name] = SpanAttributes(name)
+        if tags:
+            self.span(name).add_tags(tags)
+        if metadata:
+            self.span(name).add_metadata(metadata)
+        if metrics:
+            for metric in metrics:
+                self.span(name).add_metrics(metric['name'], metric['value'], metric['reasoning'])
+        if feedback:
+            self.span(name).add_feedback(feedback)
+
         self.current_llm_call_name.set(name)
         def decorator(func):
             @self.file_tracker.trace_decorator
