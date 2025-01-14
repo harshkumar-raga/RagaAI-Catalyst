@@ -408,15 +408,6 @@ class BaseTracer:
                 })
                 interaction_id += 1
 
-                # Process interactions from span.data if they exist
-                if "interactions" in span.data:
-                    for interaction in span.data["interactions"]:
-                        interaction["id"] = str(interaction_id)
-                        interaction["span_id"] = span.id
-                        interaction["error"] = span.error
-                        interactions.append(interaction)
-                        interaction_id += 1
-
                 # Process children of agent
                 if "children" in span.data:
                     for child in span.data["children"]:
@@ -526,6 +517,63 @@ class BaseTracer:
                     "error": span.error
                 })
                 interaction_id += 1
+            
+            elif span.type == "tool":
+                interactions.append({
+                    "id": str(interaction_id),
+                    "span_id": span.id,
+                    "interaction_type": "tool_call_start",
+                    "name": span.name,
+                    "content": {
+                    "prompt": span.data.get("input"),
+                    "response": span.data.get("output")
+                    },
+                    "timestamp": span.start_time,
+                    "error": span.error
+                })
+                interaction_id += 1
+                
+                interactions.append({
+                    "id": str(interaction_id),
+                    "span_id": span.id,
+                    "interaction_type": "tool_call_end",
+                    "name": span.name,
+                    "content": {
+                    "prompt": span.data.get("input"),
+                    "response": span.data.get("output")
+                    },
+                    "timestamp": span.start_time,
+                    "error": span.error
+                })
+                interaction_id += 1
+
+            elif span.type == "llm":
+                interactions.append({
+                    "id": str(interaction_id),
+                    "span_id": span.id,
+                    "interaction_type": "llm_call",
+                    "name": span.name,
+                    "content": {
+                    "prompt": span.data.get("input"),
+                    "response": span.data.get("output")
+                    },
+                    "timestamp": span.end_time,
+                    "error": span.error
+                })
+                interaction_id += 1
+                
+            # Process interactions from span.data if they exist
+            if span.interactions:
+                for span_interaction in span.interactions:
+                    interaction = {}
+                    interaction["id"] = str(span_interaction.id)
+                    interaction["span_id"] = span.id
+                    interaction["interaction_type"] = span_interaction.type
+                    interaction["content"] = span_interaction.content
+                    interaction["timestamp"] = span_interaction.timestamp
+                    interaction["error"] = span.error
+                    interactions.append(interaction)
+                    interaction_id += 1
 
         # Sort interactions by timestamp
         sorted_interactions = sorted(interactions, key=lambda x: x["timestamp"] if x["timestamp"] else "")
