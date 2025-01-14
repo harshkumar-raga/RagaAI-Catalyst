@@ -16,11 +16,7 @@ class Dataset:
     def __init__(self, project_name):
         self.project_name = project_name
         self.num_projects = 99999
-        Dataset.BASE_URL = (
-            os.getenv("RAGAAI_CATALYST_BASE_URL")
-            if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://catalyst.raga.ai/api"
-        )
+        Dataset.BASE_URL = RagaAICatalyst.BASE_URL
         headers = {
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
