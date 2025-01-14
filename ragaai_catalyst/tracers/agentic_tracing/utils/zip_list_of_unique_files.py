@@ -199,11 +199,14 @@ def comment_magic_commands(script_content: str) -> str:
             commented_lines.append(line)  # Keep the line unchanged
     return "\n".join(commented_lines)
 
+
+
 class TraceDependencyTracker:
     def __init__(self, output_dir=None):
         self.tracked_files = set()
         self.python_imports = set()
         self.notebook_path = None
+        self.colab_content = None  
         
         # Set output directory with Colab handling
         if JupyterNotebookHandler.is_running_in_colab():
@@ -215,6 +218,30 @@ class TraceDependencyTracker:
             self.output_dir = output_dir or os.getcwd()
         
         self.jupyter_handler = JupyterNotebookHandler()
+
+
+    def check_environment_and_save(self):
+        """Check if running in Colab and get current cell content."""
+        try:
+            from IPython import get_ipython
+            ipython = get_ipython()
+            if 'google.colab' in sys.modules:
+                logger.info("Running on Google Colab.")
+                
+                # Retrieve the current cell content dynamically in Colab
+                current_cell = ipython.history_manager.get_range()
+                script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
+                script_content = comment_magic_commands(script_content)  # Comment out magic commands
+                
+                # Store the content in the class attribute instead of saving to file
+                self.colab_content = script_content
+                logger.info("Successfully retrieved Colab cell content")
+                
+            else:
+                logger.info("Not running on Google Colab.")
+        except Exception as e:
+            logger.warning(f"Error retrieving the current cell content: {e}")
+        
 
     def track_jupyter_notebook(self):
         """Track the current notebook and its dependencies."""
@@ -231,6 +258,7 @@ class TraceDependencyTracker:
                 try:
                     with open(notebook_path, 'r', encoding='utf-8') as f:
                         notebook_content = f.read()
+                        notebook_content = comment_magic_commands(notebook_content)
                         # Find and track imported files
                         self.find_config_files(notebook_content, notebook_path)
                         # Track any additional dependencies
@@ -333,8 +361,8 @@ class TraceDependencyTracker:
                 self.tracked_files.add(os.path.abspath(colab_notebook))
                 logger.info(f"Added Colab notebook to tracked files: {colab_notebook}")
 
-            # New feature: Save current cell content to a file
-            self.check_environment_and_save()  # Call the new method
+            # Get current cell content
+            self.check_environment_and_save()
 
         # Process all files (existing code)
         for filepath in filepaths:
@@ -351,9 +379,23 @@ class TraceDependencyTracker:
             except Exception as e:
                 logger.warning(f"Could not process {filepath}: {str(e)}")
 
+        notebook_content_str = None
         if self.notebook_path and os.path.exists(self.notebook_path):
-            self.tracked_files.add(os.path.abspath(self.notebook_path))
-            logger.info(f"Added notebook to tracked files: {self.notebook_path}")
+            try:
+                with open(self.notebook_path, 'r', encoding='utf-8') as f:
+                    notebook_content = json.load(f)            
+                            
+                    cell_contents = []
+                    for cell in notebook_content.get('cells', []):
+                        if cell['cell_type'] == 'code':
+                            # Comment out magic commands in the cell's source
+                            cell_source = ''.join(cell['source'])
+                            commented_source = comment_magic_commands(cell_source)
+                            cell_contents.append(commented_source)
+
+                    notebook_content_str = '\n\n'.join(cell_contents)
+            except Exception as e:
+                logger.warning(f"Error processing notebook dependencies: {str(e)}")
 
         # Calculate hash and create zip
         self.tracked_files.update(self.python_imports)
@@ -367,9 +409,17 @@ class TraceDependencyTracker:
                     content = file.read()
                     if filepath.endswith('.py'):
                         content = remove_package_code(content.decode('utf-8'), 'ragaai_catalyst').encode('utf-8')
+                        content = comment_magic_commands(content)
                     hash_contents.append(content)
             except Exception as e:
                 logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
+
+        if notebook_content_str:
+            hash_contents.append(notebook_content_str.encode('utf-8'))
+
+        if self.colab_content:
+            hash_contents.append(self.colab_content.encode('utf-8'))
+
 
         combined_content = b''.join(hash_contents)
         hash_id = hashlib.sha256(combined_content).hexdigest()
@@ -394,38 +444,49 @@ class TraceDependencyTracker:
                 except Exception as e:
                     logger.warning(f"Could not add {filepath} to zip: {str(e)}")
 
+            if notebook_content_str:
+                py_filename = os.path.splitext(os.path.basename(self.notebook_path))[0] + ".py"
+                zipf.writestr(py_filename, notebook_content_str)
+                logger.info(f"Added notebook content to zip as: {py_filename}")
+
+            if self.colab_content:
+                colab_filename = "colab_current_cell.py"
+                zipf.writestr(colab_filename, self.colab_content)
+                logger.info(f"Added Colab cell content to zip as: {colab_filename}")
+
+
         logger.info(f"Zip file created successfully at: {zip_filename}")
         return hash_id, zip_filename
 
-    def check_environment_and_save(self):
-        """Check if running in Colab and save current cell content."""
-        try:
-            from IPython import get_ipython
-            ipython = get_ipython()
-            if 'google.colab' in sys.modules:
-                logger.info("Running on Google Colab.")
+    # def check_environment_and_save(self):
+    #     """Check if running in Colab and save current cell content."""
+    #     try:
+    #         from IPython import get_ipython
+    #         ipython = get_ipython()
+    #         if 'google.colab' in sys.modules:
+    #             logger.info("Running on Google Colab.")
                 
-                # Create traces directory if it doesn't exist
-                traces_dir = os.path.join(os.getcwd(), 'traces')
-                os.makedirs(traces_dir, exist_ok=True)
-                logger.info("Current path for saving:", traces_dir)
+    #             # Create traces directory if it doesn't exist
+    #             traces_dir = os.path.join(os.getcwd(), 'traces')
+    #             os.makedirs(traces_dir, exist_ok=True)
+    #             logger.info("Current path for saving:", traces_dir)
 
-                # Retrieve the current cell content dynamically in Colab
-                current_cell = ipython.history_manager.get_range()
-                script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
-                script_content = comment_magic_commands(script_content)  # Comment out magic commands
+    #             # Retrieve the current cell content dynamically in Colab
+    #             current_cell = ipython.history_manager.get_range()
+    #             script_content = "\n".join(input_line for _, _, input_line in current_cell if input_line.strip())
+    #             script_content = comment_magic_commands(script_content)  # Comment out magic commands
 
-                # Save the retrieved script content to a file in the traces directory
-                file_name = "dynamic_check_environment.py"
-                file_path = os.path.join(traces_dir, file_name)
+    #             # Save the retrieved script content to a file in the traces directory
+    #             file_name = "dynamic_check_environment.py"
+    #             file_path = os.path.join(traces_dir, file_name)
 
-                with open(file_path, "w") as file:
-                    file.write(script_content)
-                logger.info(f"Script saved successfully at: {file_path}")
-            else:
-                logger.info("Not running on Google Colab.")
-        except Exception as e:
-            logger.warning(f"Error retrieving the current cell content: {e}")
+    #             with open(file_path, "w") as file:
+    #                 file.write(script_content)
+    #             logger.info(f"Script saved successfully at: {file_path}")
+    #         else:
+    #             logger.info("Not running on Google Colab.")
+    #     except Exception as e:
+    #         logger.warning(f"Error retrieving the current cell content: {e}")
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
     """Create a zip file containing all unique files and their dependencies."""
