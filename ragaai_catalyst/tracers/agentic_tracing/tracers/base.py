@@ -177,10 +177,6 @@ class BaseTracer:
             self.trace = self._change_agent_input_output(self.trace)
             self.trace = self._extract_cost_tokens(self.trace)
             
-            # Format interactions and add to trace
-            interactions = self.format_interactions()
-            self.trace.interactions = interactions["interactions"]
-            
             # Create traces directory if it doesn't exist
             self.traces_dir = tempfile.gettempdir()
             filename = self.trace.id + ".json"
@@ -196,6 +192,10 @@ class BaseTracer:
             # Clean up trace_data before saving
             trace_data = self.trace.__dict__
             cleaned_trace_data = self._clean_trace(trace_data)
+            
+            # Format interactions and add to trace
+            interactions = self.format_interactions()
+            self.trace.interactions = interactions["interactions"]
 
             with open(filepath, 'w') as f:
                 json.dump(cleaned_trace_data, f, cls=TracerJSONEncoder, indent=2)
