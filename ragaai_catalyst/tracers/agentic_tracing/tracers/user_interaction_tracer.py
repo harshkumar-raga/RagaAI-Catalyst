@@ -73,6 +73,21 @@ class UserInteractionTracer:
         return self.original_print(*args, **kwargs)
 
     def traced_open(self, file: str, mode: str = 'r', *args, **kwargs):
+        # Skip tracing for system and virtual environment paths
+        system_paths = [
+            'site-packages',
+            'dist-packages',
+            '/proc/',
+            '/sys/',
+            '/var/lib/',
+            '/usr/lib/',
+            '/System/Library'
+        ]
+        
+        file_str = str(file)
+        if any(path in file_str for path in system_paths):
+            return self.original_open(file, mode, *args, **kwargs)
+            
         file_obj = self.original_open(file, mode, *args, **kwargs)
         return TracedFile(file_obj, file, self)
 
