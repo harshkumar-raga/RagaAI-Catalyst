@@ -195,7 +195,7 @@ class BaseTracer:
             
             # Format interactions and add to trace
             interactions = self.format_interactions()
-            self.trace.interactions = interactions["interactions"]
+            self.trace.workflow = interactions["workflow"]
 
             with open(filepath, 'w') as f:
                 json.dump(cleaned_trace_data, f, cls=TracerJSONEncoder, indent=2)
@@ -448,12 +448,59 @@ class BaseTracer:
                             interactions.append({
                                 "id": str(interaction_id),
                                 "span_id": child.get("id"),
-                                "interaction_type": "llm_call",
+                                "interaction_type": "llm_call_start",
                                 "name": child.get("name"),
                                 "content": {
                                     "prompt": child.get("data", {}).get("input"),
+                                },
+                                "timestamp": child.get("start_time"),
+                                "error": child.get('error')
+                            })
+                            interaction_id += 1
+                            
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "span_id": child.get("id"),
+                                "interaction_type": "llm_call_stop",
+                                "name": child.get("name"),
+                                "content": {
                                     "response": child.get("data", {}).get("output")
                                 },
+                                "timestamp": child.get("end_time"),
+                                "error": child.get('error')
+                            })
+                            interaction_id += 1
+                            
+                        elif child_type == "agent":
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "span_id": child.get("id"),
+                                "interaction_type": "agent_call_start",
+                                "name": child.get("name"),
+                                "content": None,
+                                "timestamp": child.get("start_time"),
+                                "error": child.get('error')
+                            })
+                            interaction_id += 1
+                            
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "span_id": child.get("id"),
+                                "interaction_type": "agent_call_end",
+                                "name": child.get("name"),
+                                "content": child.get("data", {}).get("output"),
+                                "timestamp": child.get("end_time"),
+                                "error": child.get('error')
+                            })
+                            interaction_id += 1
+                            
+                        else:
+                            interactions.append({
+                                "id": str(interaction_id),
+                                "span_id": child.get("id"),
+                                "interaction_type": child_type,
+                                "name": child.get("name"),
+                                "content": child.get("data", {}),
                                 "timestamp": child.get("start_time"),
                                 "error": child.get('error')
                             })
@@ -527,7 +574,7 @@ class BaseTracer:
                     "prompt": span.data.get("input"),
                     "response": span.data.get("output")
                     },
-                    "timestamp": span.start_time,
+                    "timestamp": span.end_time,
                     "error": span.error
                 })
                 interaction_id += 1
@@ -536,13 +583,37 @@ class BaseTracer:
                 interactions.append({
                     "id": str(interaction_id),
                     "span_id": span.id,
-                    "interaction_type": "llm_call",
+                    "interaction_type": "llm_call_start",
                     "name": span.name,
                     "content": {
                     "prompt": span.data.get("input"),
+                    },
+                    "timestamp": span.start_time,
+                    "error": span.error
+                })
+                interaction_id += 1
+                
+                interactions.append({
+                    "id": str(interaction_id),
+                    "span_id": span.id,
+                    "interaction_type": "llm_call_stop",
+                    "name": span.name,
+                    "content": {
                     "response": span.data.get("output")
                     },
                     "timestamp": span.end_time,
+                    "error": span.error
+                })
+                interaction_id += 1
+                
+            else:
+                interactions.append({
+                    "id": str(interaction_id),
+                    "span_id": span.id,
+                    "interaction_type": span.type,
+                    "name": span.name,
+                    "content": span.data,
+                    "timestamp": span.start_time,
                     "error": span.error
                 })
                 interaction_id += 1
@@ -591,4 +662,4 @@ class BaseTracer:
         for idx, interaction in enumerate(sorted_interactions, 1):
             interaction["id"] = str(idx)
 
-        return {"interactions": sorted_interactions}
+        return {"workflow": sorted_interactions}
