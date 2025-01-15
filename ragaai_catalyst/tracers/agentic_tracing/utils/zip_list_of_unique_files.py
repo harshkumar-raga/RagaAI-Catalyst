@@ -260,9 +260,9 @@ class TraceDependencyTracker:
                         # Find and track imported files
                         self.find_config_files(notebook_content, notebook_path)
                 except Exception as e:
-                    logger.warning(f"Error processing notebook dependencies: {str(e)}")
+                    pass
             else:
-                logger.warning("No notebook path found to track")
+                pass
 
 
     def track_file_access(self, filepath):
@@ -294,31 +294,6 @@ class TraceDependencyTracker:
                     except (UnicodeDecodeError, IOError):
                         pass
 
-    # def track_notebook_files(self, notebook_path):
-    #     """Track all files used in the Jupyter notebook."""
-    #     try:
-    #         with open(notebook_path, 'r', encoding='utf-8') as f:
-    #             content = f.read()
-    #         self.find_config_files(content, notebook_path)  # Find and track config files
-            
-    #         # Track PDF files dynamically
-    #         pdf_pattern = r'\"([^\"]+\.pdf)\"'  # Regex to find PDF file paths
-    #         matches = re.finditer(pdf_pattern, content)
-    #         for match in matches:
-    #             pdf_filepath = match.group(1)
-    #             self.track_file_access(pdf_filepath)  # Track the PDF file
-
-    #         # Track other file types if needed (e.g., images, text files)
-    #         other_file_pattern = r'\"([^\"]+\.(pdf|txt|png|jpg|jpeg|csv))\"'  # Extend as needed
-    #         other_matches = re.finditer(other_file_pattern, content)
-    #         for match in other_matches:
-    #             other_filepath = match.group(1)
-    #             self.track_file_access(other_filepath)  # Track other files
-
-    #     except Exception as e:
-    #         print(f"Warning: Could not read notebook {notebook_path}: {str(e)}")
-
-
     def analyze_python_imports(self, filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as file:
@@ -337,8 +312,7 @@ class TraceDependencyTracker:
                     except (ImportError, AttributeError):
                         pass
         except Exception as e:
-            print(f"Warning: Could not analyze imports in {filepath}: {str(e)}")
-
+            pass
 
     def create_zip(self, filepaths):
         self.track_jupyter_notebook()
@@ -350,12 +324,12 @@ class TraceDependencyTracker:
 
         # Special handling for Colab
         if self.jupyter_handler.is_running_in_colab():
-            logger.info("Running in Google Colab environment")
+            # logger.info("Running in Google Colab environment")
             # Try to get the Colab notebook path
             colab_notebook = self.jupyter_handler.get_notebook_path()
             if colab_notebook:
                 self.tracked_files.add(os.path.abspath(colab_notebook))
-                logger.info(f"Added Colab notebook to tracked files: {colab_notebook}")
+                # logger.info(f"Added Colab notebook to tracked files: {colab_notebook}")
 
             # Get current cell content
             self.check_environment_and_save()
@@ -373,7 +347,7 @@ class TraceDependencyTracker:
                 if filepath.endswith('.py'):
                     self.analyze_python_imports(abs_path)
             except Exception as e:
-                logger.warning(f"Could not process {filepath}: {str(e)}")
+                pass
 
         notebook_content_str = None
         if self.notebook_path and os.path.exists(self.notebook_path):
@@ -395,7 +369,7 @@ class TraceDependencyTracker:
                         self.tracked_files.remove(notebook_abs_path)
 
             except Exception as e:
-                logger.warning(f"Error processing notebook dependencies: {str(e)}")
+                pass
 
         # Calculate hash and create zip
         self.tracked_files.update(self.python_imports)
@@ -413,7 +387,7 @@ class TraceDependencyTracker:
                     hash_contents.append(content)
             except Exception as e:
                 # logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
-                logger.info("saving")
+                pass
 
 
         if notebook_content_str:
@@ -437,14 +411,14 @@ class TraceDependencyTracker:
 
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for filepath in sorted(self.tracked_files):
-                if 'env' in filepath:
+                if 'env' in filepath or 'ragaai_catalyst' in filepath:
                     continue
                 try:
                     relative_path = os.path.relpath(filepath, base_path)
                     zipf.write(filepath, relative_path)
                     logger.info(f"Added python script to zip: {relative_path}")
                 except Exception as e:
-                    logger.warning(f"Could not add {filepath} to zip: {str(e)}")
+                    pass
 
             if notebook_content_str:
                 py_filename = os.path.splitext(os.path.basename(self.notebook_path))[0] + ".py"
