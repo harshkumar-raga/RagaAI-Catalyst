@@ -25,6 +25,9 @@ from ..utils.trace_utils import load_model_costs
 from ..utils.unique_decorator import generate_unique_hash_simple   
 from ..utils.file_name_tracker import TrackName
 from ..utils.span_attributes import SpanAttributes
+import logging
+logger = logging.getLogger(__name__)
+logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") else logger.setLevel(logging.INFO)
 
 
 class LLMTracerMixin:
@@ -495,16 +498,21 @@ class LLMTracerMixin:
         if metadata:
             self.span(name).add_metadata(metadata)
         if metrics:
+            if isinstance(metrics, dict):
+                metrics = [metrics]
             for metric in metrics:
-                self.span(name).add_metrics(
-                    name = metric['name'], 
-                    score = metric['score'], 
-                    reasoning = metric.get('reasoning', ''), 
-                    cost = metric.get('cost', None), 
-                    latency = metric.get('latency', None), 
-                    metadata = metric.get('metadata', {}), 
-                    config = metric.get('config', {})
-                )
+                try:
+                    self.span(name).add_metrics(
+                        name = metric['name'], 
+                        score = metric['score'], 
+                        reasoning = metric.get('reasoning', ''), 
+                        cost = metric.get('cost', None), 
+                        latency = metric.get('latency', None), 
+                        metadata = metric.get('metadata', {}), 
+                        config = metric.get('config', {})
+                    )
+                except KeyError as e:
+                    logger.error(f"Error adding metric: {e}")
         if feedback:
             self.span(name).add_feedback(feedback)
 

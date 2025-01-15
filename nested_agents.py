@@ -51,7 +51,7 @@ class SummaryAgent:
     def __init__(self, persona="Summary Agent"):
         self.persona = persona
 
-    @tracer.trace_agent(name="summary_agent", tags=['basic_agent'])
+    @tracer.trace_agent(name="summary_agent", tags=['basic_agent'], metrics=[{'name': 'accuracy', 'reason': 'There is some reason for it'}])
     def summarize(self, text):
         # Make an LLM call
         prompt = f"Please summarize this text concisely: {text}"
