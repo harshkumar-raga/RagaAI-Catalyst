@@ -458,45 +458,6 @@ class BaseTracer:
                                 "error": child.get('error')
                             })
                             interaction_id += 1
-
-                        elif child_type == "file":
-                            operation = child.get("data", {}).get("operation")
-                            if operation == "read":
-                                interaction_type = "file_read"
-                            elif operation == "write":
-                                interaction_type = "file_write"
-                            else:
-                                continue
-
-                            interactions.append({
-                                "id": str(interaction_id),
-                                "span_id": child.get("id"),
-                                "interaction_type": interaction_type,
-                                "name": None,
-                                "content": {
-                                    "file_path": child.get("data", {}).get("path"),
-                                    "mode": child.get("data", {}).get("mode"),
-                                    "content": child.get("data", {}).get("content")
-                                },
-                                "timestamp": child.get("start_time"),
-                                "error": child.get('error')
-                            })
-                            interaction_id += 1
-
-                        elif child_type == "network":
-                            interactions.append({
-                                "id": str(interaction_id),
-                                "span_id": child.get("id"),
-                                "interaction_type": "network_call",
-                                "name": child.get("name"),
-                                "content": {
-                                    "request": child.get("data", {}).get("request"),
-                                    "response": child.get("data", {}).get("response")
-                                },
-                                "timestamp": child.get("start_time"),
-                                "error": child.get('error')
-                            })
-                            interaction_id += 1
                             
                         if "interactions" in child:
                             for interaction in child["interactions"]:
@@ -504,6 +465,30 @@ class BaseTracer:
                                 interaction["span_id"] = child.get("id")
                                 interaction["error"] = None
                                 interactions.append(interaction)
+                                interaction_id += 1
+                                
+                        if "network_calls" in child:
+                            for child_network_call in child["network_calls"]:
+                                network_call = {}
+                                network_call["id"] = str(interaction_id)
+                                network_call['span_id'] = child.get("id")
+                                network_call["interaction_type"] = "network_call"
+                                network_call["name"] = None
+                                network_call["content"] = {
+                                    "request": {
+                                        "url": child_network_call.get("url"),
+                                        "method": child_network_call.get("method"),
+                                        "headers": child_network_call.get("headers"),
+                                    },
+                                    "response":{
+                                        "status_code": child_network_call.get("status_code"),
+                                        "headers": child_network_call.get("response_headers"),
+                                        "body": child_network_call.get("response_body"),
+                                    }
+                                }
+                                network_call["timestamp"] = child_network_call['start_time']
+                                network_call["error"] = child_network_call.get('error')
+                                interactions.append(network_call)
                                 interaction_id += 1
 
                 # Add agent_end interaction
@@ -573,6 +558,30 @@ class BaseTracer:
                     interaction["timestamp"] = span_interaction.timestamp
                     interaction["error"] = span.error
                     interactions.append(interaction)
+                    interaction_id += 1
+                    
+            if span.network_calls:
+                for span_network_call in span.network_calls:
+                    network_call = {}
+                    network_call["id"] = str(span_interaction.id)
+                    network_call['span_id'] = span.id
+                    network_call["interaction_type"] = "network_call"
+                    network_call["name"] = None
+                    network_call["content"] = {
+                        "request": {
+                            "url": span_network_call.get("url"),
+                            "method": span_network_call.get("method"),
+                            "headers": span_network_call.get("headers"),
+                        },
+                        "response":{
+                            "status_code": span_network_call.get("status_code"),
+                            "headers": span_network_call.get("response_headers"),
+                            "body": span_network_call.get("response_body"),
+                        }
+                    }
+                    network_call["timestamp"] = span_network_call['start_time']
+                    network_call["error"] = span_network_call.get('error')
+                    interactions.append(network_call)
                     interaction_id += 1
 
         # Sort interactions by timestamp
