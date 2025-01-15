@@ -63,7 +63,7 @@ class AnalysisAgent:
         self.persona = persona
         self.summary_agent = SummaryAgent()
 
-    @tracer.trace_agent(name="analysis_agent", tags=['coordinator_agent'])
+    @tracer.trace_agent(name="analysis_agent", tags=['coordinator_agent'], metrics=[{'name': 'correctness', 'score': 0.5}, {'name': 'accuracy', 'score': 0.8}])
     def analyze(self, text):
         # First use the summary agent
         summary = self.summary_agent.summarize(text)
@@ -121,6 +121,7 @@ def main():
     # result = recommendation_agent.recommend(text)
     result = get_recommendation(recommendation_agent, text)
     tracer.span('llm_call').add_metadata({'is_completed': True})
+    tracer.span('recommendation_agent').add_metrics(name='hallucination', score=0.5, reasoning='some reasoning')
     
     print("\nResults:")
     print("Summary:", result["summary"])

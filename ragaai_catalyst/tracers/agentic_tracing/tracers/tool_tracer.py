@@ -30,7 +30,15 @@ class ToolTracerMixin:
             self.span(name).add_metadata(metadata)
         if metrics:
             for metric in metrics:
-                self.span(name).add_metrics(metric['name'], metric['value'], metric['reasoning'])
+                self.span(name).add_metrics(
+                    name = metric['name'], 
+                    score = metric['score'], 
+                    reasoning = metric.get('reasoning', ''), 
+                    cost = metric.get('cost', None), 
+                    latency = metric.get('latency', None), 
+                    metadata = metric.get('metadata', {}), 
+                    config = metric.get('config', {})
+                )
         if feedback:
             self.span(name).add_feedback(feedback)
         def decorator(func):

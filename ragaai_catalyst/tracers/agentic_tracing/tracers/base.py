@@ -425,10 +425,8 @@ class BaseTracer:
             'tags': span_attributes.tags,
             'user_metadata': span_attributes.metadata
         }
-        metrics = {
-            'metrics': span_attributes.metrics
-        }
-        feedback = None
+        metrics = span_attributes.metrics
+        feedback = span_attributes.feedback
         if isinstance(span, dict):
             span['metadata'] = metadata
             span['metrics'] = metrics

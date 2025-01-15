@@ -17,11 +17,26 @@ class SpanAttributes:
     def add_metadata(self, metadata):
         self.metadata.update(metadata)
 
-    def add_metrics(self, metric_name: str, metric_value: float|int, metric_reasoning: str):
+    def add_metrics(
+        self, 
+        name: str, 
+        score: float|int, 
+        reasoning: str='', 
+        cost: float=None, 
+        latency: float=None, 
+        metadata: Dict[str, Any]={}, 
+        config: Dict[str, Any]={}
+        ):
         self.metrics.append({
-            "name": metric_name,
-            "value": metric_value,
-            "reasoning": metric_reasoning
+            "name": name,
+            "score": score,
+            "reason": reasoning, 
+            "source": 'user', 
+            "cost": cost,
+            "latency": latency, 
+            "metadata": metadata,
+            "mappings": [],
+            "config": config
         })
     
     def add_feedback(self, feedback: Any):
