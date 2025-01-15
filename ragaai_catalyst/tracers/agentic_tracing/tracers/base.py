@@ -9,7 +9,6 @@ from typing import List
 import uuid
 import sys
 import tempfile
-import logging
 
 from ..data.data_structure import (
     Trace, Metadata, SystemInfo, OSInfo, EnvironmentInfo,
@@ -25,10 +24,10 @@ from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
 
 
 # Configure logging to show debug messages (which includes info messages as well)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Create a logger object
+import logging
 logger = logging.getLogger(__name__)
+logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
+
 
 
 class TracerJSONEncoder(json.JSONEncoder):
