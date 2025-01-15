@@ -9,6 +9,7 @@ from typing import List
 import uuid
 import sys
 import tempfile
+import logging
 
 from ..data.data_structure import (
     Trace, Metadata, SystemInfo, OSInfo, EnvironmentInfo,
@@ -21,6 +22,14 @@ from ..upload.upload_agentic_traces import UploadAgenticTraces
 from ..upload.upload_code import upload_code
 from ..utils.file_name_tracker import TrackName
 from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
+
+
+# Configure logging to show debug messages (which includes info messages as well)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Create a logger object
+logger = logging.getLogger(__name__)
+
 
 class TracerJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -195,8 +204,9 @@ class BaseTracer:
 
             with open(filepath, 'w') as f:
                 json.dump(cleaned_trace_data, f, cls=TracerJSONEncoder, indent=2)
-                
-            print(f"Trace saved to {filepath}")
+
+            logger.info(" Traces saved successfully.")
+            logger.debug(f"Trace saved to {filepath}")
             # Upload traces
             json_file_path = str(filepath)
             project_name = self.project_name

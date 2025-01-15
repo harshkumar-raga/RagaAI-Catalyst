@@ -6,23 +6,21 @@ import ast
 import importlib.util
 import json
 import astor
-from pathlib import Path
-import logging
-from IPython import get_ipython
 import ipynbname
 import sys
-logger = logging.getLogger(__name__)
+
+from pathlib import Path
+from IPython import get_ipython
+
 
 if 'get_ipython' in locals():
     ipython_instance = get_ipython()
     if ipython_instance:
-        ipython_instance.run_line_magic('reset', '-f out')
+        ipython_instance.run_line_magic('reset', '-f')
 
-# Reinitialize logger to ensure it doesn't carry over logs from previous runs
+import logging
 logger = logging.getLogger(__name__)
-for handler in logger.handlers[:]:  # Remove all old handlers
-    logger.removeHandler(handler)
-logging.basicConfig(level=logging.INFO)  # Set desired logging level
+logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
 
 
 # Define the PackageUsageRemover class
@@ -416,22 +414,23 @@ class TraceDependencyTracker:
                 try:
                     relative_path = os.path.relpath(filepath, base_path)
                     zipf.write(filepath, relative_path)
-                    logger.info(f"Added python script to zip: {relative_path}")
+                    logger.debug(f"Added python script to zip: {relative_path}")
                 except Exception as e:
                     pass
 
             if notebook_content_str:
                 py_filename = os.path.splitext(os.path.basename(self.notebook_path))[0] + ".py"
                 zipf.writestr(py_filename, notebook_content_str)
-                logger.info(f"Added notebook content to zip as: {py_filename}")
+                logger.debug(f"Added notebook content to zip as: {py_filename}")
 
             if self.colab_content:
                 colab_filename = "colab_file.py"
                 zipf.writestr(colab_filename, self.colab_content)
-                logger.info(f"Added Colab cell content to zip as: {colab_filename}")
+                logger.debug(f"Added Colab cell content to zip as: {colab_filename}")
 
 
-        logger.info(f"Zip file created successfully at: {zip_filename}")
+        logger.info(" Zip file created successfully.")
+        logger.debug(f"Zip file created successfully at: {zip_filename}")
         return hash_id, zip_filename
 
 def zip_list_of_unique_files(filepaths, output_dir=None):
