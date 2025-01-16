@@ -225,11 +225,12 @@ def extract_llm_output(result):
             "content": choice.message.content,
             "role": choice.message.role
         } for choice in result.choices])
-    
+
+
     # Handle Anthropic format
-    if hasattr(result, "completion"):
+    if hasattr(result, "content"):
         return OutputResponse([{
-            "content": result.completion,
+            "content": result.content[0].text,
             "role": "assistant"
         }])
     
