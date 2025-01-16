@@ -55,6 +55,7 @@ class UserInteractionTracer:
             
         self.interactions.append({
             "id": str(uuid.uuid4()),
+            "component_id": self.component_id.get(),
             "interaction_type": "input",
             "content": content,
             "timestamp": datetime.now().isoformat()
@@ -66,6 +67,7 @@ class UserInteractionTracer:
         
         self.interactions.append({
             "id": str(uuid.uuid4()),
+            "component_id": self.component_id.get(),
             "interaction_type": "output",
             "content": content,
             "timestamp": datetime.now().isoformat()
@@ -107,6 +109,7 @@ class UserInteractionTracer:
         # If no matching interaction found or couldn't merge, create new one
         interaction = {
             "id": str(uuid.uuid4()),
+            "component_id": self.component_id.get(),
             "interaction_type": interaction_type,
             "file_path": file_path,
             "timestamp": datetime.now().isoformat()

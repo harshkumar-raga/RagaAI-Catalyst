@@ -61,7 +61,6 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         """Start tracking network calls for a component"""
         self.component_network_calls[component_id] = []
         self.network_tracer.network_calls = []  # Reset network calls
-        self.component_user_interaction[component_id] = []
         self.current_component_id.set(component_id)
         self.user_interaction_tracer.component_id.set(component_id)
 
@@ -69,8 +68,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         """End tracking network calls for a component"""
         self.component_network_calls[component_id] = self.network_tracer.network_calls.copy()
         self.network_tracer.network_calls = []  # Reset for next component
-        self.component_user_interaction[component_id] = self.user_interaction_tracer.interactions.copy()
-        self.user_interaction_tracer.interactions = []
+        self.component_user_interaction[component_id] = [interaction for interaction in self.user_interaction_tracer.interactions if interaction.get('component_id') == component_id]
 
     def start(self):
         """Start tracing"""
