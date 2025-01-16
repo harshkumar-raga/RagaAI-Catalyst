@@ -26,6 +26,12 @@ def extract_model_name(args, kwargs, result):
             # Try model attribute
             elif hasattr(instance, "model"):
                 model = instance.model
+
+    # Handle vertex ai case
+    if not model:
+        model = kwargs.get("run_manager", '')
+        if model:
+            model = model.get('ls_model_name', '')
     
     # Normalize Google model names
     if model and isinstance(model, str):
@@ -194,7 +200,7 @@ def extract_llm_output(result):
         else:
             # We're in an async context, but this function is called synchronously
             # Return a placeholder and let the caller handle the coroutine
-            return OutputResponse("Coroutine result pending")
+            return OutputResponse([{'content': "Coroutine result pending", "role": "assistant"}])
 
     # Handle Google GenerativeAI format
     if hasattr(result, "result"):
@@ -213,11 +219,23 @@ def extract_llm_output(result):
         return OutputResponse(output)
     
     # Handle Vertex AI format
+    # format1
     if hasattr(result, "text"):
         return OutputResponse([{
             "content": result.text,
             "role": "assistant"
         }])
+
+
+    # format2
+    if hasattr(result, "generations"):
+        output = []
+        for generation in result.generations:
+            output.append({
+                "content": generation.text,
+                "role": "assistant"
+            })
+        return OutputResponse(output)
     
     # Handle OpenAI format
     if hasattr(result, "choices"):
@@ -235,7 +253,7 @@ def extract_llm_output(result):
         }])
     
     # Default case
-    return OutputResponse(str(result))
+    return OutputResponse([{'content': result, 'role': 'assistant'}])
 
 
 def extract_llm_data(args, kwargs, result):
