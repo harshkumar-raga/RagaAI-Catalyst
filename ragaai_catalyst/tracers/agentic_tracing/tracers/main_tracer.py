@@ -13,6 +13,7 @@ from .tool_tracer import ToolTracerMixin
 from .agent_tracer import AgentTracerMixin
 from .network_tracer import NetworkTracer
 from .user_interaction_tracer import UserInteractionTracer
+from .custom_tracer import CustomTracerMixin
 
 from ..data.data_structure import (
     Trace, Metadata, SystemInfo, OSInfo, EnvironmentInfo,
@@ -25,13 +26,14 @@ from ..data.data_structure import (
 from ....ragaai_catalyst import RagaAICatalyst
 from ragaai_catalyst.tracers.upload_traces import UploadTraces
 
-class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMixin):
-    def __init__(self, user_detail, auto_instrument_llm: bool = True):
+class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMixin, CustomTracerMixin):
+    def __init__(self, user_detail, auto_instrumentation=None):
         # Initialize all parent classes
         self.user_interaction_tracer = UserInteractionTracer()
         LLMTracerMixin.__init__(self)
         ToolTracerMixin.__init__(self)
         AgentTracerMixin.__init__(self)
+        CustomTracerMixin.__init__(self)
         
         self.project_name = user_detail["project_name"]
         self.project_id = user_detail["project_id"]
@@ -42,12 +44,45 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
 
         BaseTracer.__init__(self, user_detail)
         
-        self.auto_instrument_llm = auto_instrument_llm
         self.tools: Dict[str, Tool] = {}
         self.call_depth = contextvars.ContextVar("call_depth", default=0)
         self.current_component_id = contextvars.ContextVar("current_component_id", default=None)
         self.network_tracer = NetworkTracer()
-        self.is_active = False
+        
+        # Handle auto_instrumentation
+        if auto_instrumentation is None:
+            # Default behavior: everything enabled
+            self.is_active = True
+            self.auto_instrument_llm = True
+            self.auto_instrument_tool = True
+            self.auto_instrument_agent = True
+            self.auto_instrument_user_interaction = True
+            self.auto_instrument_file_io = True
+            self.auto_instrument_network = True
+            self.auto_instrument_custom = True
+        else:
+            # Set global active state
+            self.is_active = any(auto_instrumentation.values()) if isinstance(auto_instrumentation, dict) else bool(auto_instrumentation)
+            
+            # Set individual components
+            if isinstance(auto_instrumentation, dict):
+                self.auto_instrument_llm = auto_instrumentation.get('llm', False)
+                self.auto_instrument_tool = auto_instrumentation.get('tool', False)
+                self.auto_instrument_agent = auto_instrumentation.get('agent', False)
+                self.auto_instrument_user_interaction = auto_instrumentation.get('user_interaction', False)
+                self.auto_instrument_file_io = auto_instrumentation.get('file_io', False)
+                self.auto_instrument_network = auto_instrumentation.get('network', False)
+                self.auto_instrument_custom = auto_instrumentation.get('custom', False)
+            else:
+                # If boolean provided, apply to all components
+                self.auto_instrument_llm = bool(auto_instrumentation)
+                self.auto_instrument_tool = bool(auto_instrumentation)
+                self.auto_instrument_agent = bool(auto_instrumentation)
+                self.auto_instrument_user_interaction = bool(auto_instrumentation)
+                self.auto_instrument_file_io = bool(auto_instrumentation)
+                self.auto_instrument_network = bool(auto_instrumentation)
+                self.auto_instrument_custom = bool(auto_instrumentation)
+            
         self.current_agent_id = contextvars.ContextVar("current_agent_id", default=None)
         self.agent_children = contextvars.ContextVar("agent_children", default=[])
         self.component_network_calls = {}  # Store network calls per component
@@ -74,6 +109,9 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
 
     def start(self):
         """Start tracing"""
+        if not self.is_active:
+            return
+            
         # Setup user interaction tracing
         self.user_interaction_tracer.project_id.set(self.project_id)
         self.user_interaction_tracer.trace_id.set(self.trace_id)
@@ -85,14 +123,40 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         
         # Start base tracer (includes system info and resource monitoring)
         super().start()
-        self.is_active = True
         
         # Activate network tracing
         self.network_tracer.activate_patches()
         
-        # Instrument calls from mixins
+        # take care of the auto instrumentation
         if self.auto_instrument_llm:
             self.instrument_llm_calls()
+            
+        if self.auto_instrument_tool:
+            self.instrument_tool_calls()
+
+        if self.auto_instrument_agent:
+            self.instrument_agent_calls()
+
+        if self.auto_instrument_custom:
+            self.instrument_custom_calls()
+
+        if self.auto_instrument_user_interaction:
+
+            ToolTracerMixin.instrument_user_interaction_calls(self)
+            LLMTracerMixin.instrument_user_interaction_calls(self)
+            AgentTracerMixin.instrument_user_interaction_calls(self)
+            CustomTracerMixin.instrument_user_interaction_calls(self)
+            
+        if self.auto_instrument_network:
+            ToolTracerMixin.instrument_network_calls(self)
+            LLMTracerMixin.instrument_network_calls(self)
+            AgentTracerMixin.instrument_network_calls(self)
+            CustomTracerMixin.instrument_network_calls(self)
+            
+        # These will be implemented later
+        # if self.auto_instrument_file_io:
+        #     self.instrument_file_io_calls()
+        
 
     def stop(self):
         """Stop tracing and save results"""

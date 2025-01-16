@@ -48,8 +48,16 @@ class LLMTracerMixin:
         self.total_tokens = 0
         self.total_cost = 0.0
         self.llm_data = {}
+        
+        # Add auto_instrument options
+        self.auto_instrument_llm = False
+        self.auto_instrument_user_interaction = False
+        self.auto_instrument_network = False
 
     def instrument_llm_calls(self):
+        """Enable LLM instrumentation"""
+        self.auto_instrument_llm = True
+        
         # Handle modules that are already imported
         import sys
         
@@ -82,6 +90,14 @@ class LLMTracerMixin:
         # Add hooks for LangChain integrations
         wrapt.register_post_import_hook(self.patch_langchain_google_methods, "langchain_google_vertexai")
         wrapt.register_post_import_hook(self.patch_langchain_google_methods, "langchain_google_genai")
+
+    def instrument_user_interaction_calls(self):
+        """Enable user interaction instrumentation for LLM calls"""
+        self.auto_instrument_user_interaction = True
+
+    def instrument_network_calls(self):
+        """Enable network instrumentation for LLM calls"""
+        self.auto_instrument_network = True
 
     def patch_openai_methods(self, module):
         try:
@@ -254,6 +270,14 @@ class LLMTracerMixin:
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
 
+        network_calls = []
+        if self.auto_instrument_network:
+            network_calls = self.component_network_calls.get(component_id, [])
+        
+        interactions = []
+        if self.auto_instrument_user_interaction:
+            interactions = self.component_user_interaction.get(component_id, [])
+
         component = {
             "id": component_id,
             "hash_id": hash_id,
@@ -277,8 +301,8 @@ class LLMTracerMixin:
                 "output": output_data.output_response if output_data else None,
                 "memory_used": memory_used
             },
-            "network_calls": self.component_network_calls.get(component_id, []),
-            "interactions": self.component_user_interaction.get(component_id, [])
+            "network_calls": network_calls,
+            "interactions": interactions
         }
 
         if self.gt: 
@@ -299,6 +323,9 @@ class LLMTracerMixin:
     async def trace_llm_call(self, original_func, *args, **kwargs):
         """Trace an LLM API call"""
         if not self.is_active:
+            return await original_func(*args, **kwargs)
+
+        if not self.auto_instrument_llm:
             return await original_func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
@@ -392,6 +419,9 @@ class LLMTracerMixin:
         if not self.is_active:
             if asyncio.iscoroutinefunction(original_func):
                 return asyncio.run(original_func(*args, **kwargs))
+            return original_func(*args, **kwargs)
+
+        if not self.auto_instrument_llm:
             return original_func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
