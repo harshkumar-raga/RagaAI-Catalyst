@@ -245,8 +245,9 @@ class ComponentInfo:
     cost: Optional[Dict[str, float]] = None
 
 class Trace:
-    def __init__(self, id: str, project_name: str, start_time: str, end_time: str, metadata: Optional[Metadata] = None, data: Optional[List[Dict[str, Any]]] = None, replays: Optional[Dict[str, Any]] = None):
+    def __init__(self, id: str, trace_name: str, project_name: str, start_time: str, end_time: str, metadata: Optional[Metadata] = None, data: Optional[List[Dict[str, Any]]] = None, replays: Optional[Dict[str, Any]] = None):
         self.id = id
+        self.trace_name = trace_name
         self.project_name = project_name
         self.start_time = start_time
         self.end_time = end_time
@@ -257,6 +258,7 @@ class Trace:
     def to_dict(self):
         return {
             "id": self.id,
+            "trace_name": self.trace_name,
             "project_name": self.project_name,
             "start_time": self.start_time,
             "end_time": self.end_time,

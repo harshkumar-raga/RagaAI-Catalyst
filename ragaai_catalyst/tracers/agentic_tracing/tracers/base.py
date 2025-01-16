@@ -57,6 +57,7 @@ class BaseTracer:
         self.project_name = self.user_details['project_name']  # Access the project_name
         self.dataset_name = self.user_details['dataset_name']  # Access the dataset_name
         self.project_id = self.user_details['project_id']  # Access the project_id
+        self.trace_name = self.user_details['trace_name']  # Access the trace_name
         
         # Initialize trace data
         self.trace_id = None
@@ -166,6 +167,7 @@ class BaseTracer:
         
         self.trace = Trace(
             id=self.trace_id,
+            trace_name=self.trace_name,
             project_name=self.project_name,
             start_time=datetime.now().isoformat(),
             end_time="",  # Will be set when trace is stopped
