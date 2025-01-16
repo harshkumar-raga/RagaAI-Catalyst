@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 import functools
 from typing import Optional, Any, Dict, List
-from ..utils.unique_decorator import generate_unique_hash_simple
+from ..utils.unique_decorator import generate_unique_hash_simple, mydecorator
 import contextvars
 import asyncio
 from ..utils.file_name_tracker import TrackName
@@ -26,175 +26,226 @@ class CustomTracerMixin:
         self.auto_instrument_user_interaction = False
         self.auto_instrument_network = False
 
-    def trace_custom(self, name: str = None, custom_type: str = None, trace_variables: bool = True):
-        """
-        Decorator for tracing custom functions.
-        Usage:
-            @tracer.trace_custom(name="my_function", custom_type="data_processor", trace_variables=True)
-            def my_function():
-                pass
-        """
+    def trace_custom(self, name: str = None, custom_type: str = "generic", version: str = "1.0.0", trace_variables: bool = True):
         def decorator(func):
+            # Add metadata attribute to the function
+            metadata = {
+                "name": name or func.__name__,
+                "custom_type": custom_type,
+                "version": version,
+                "trace_variables": trace_variables,
+                "is_active": True
+            }
+            
+            # Check if the function is async
+            is_async = asyncio.iscoroutinefunction(func)
+
+            @self.file_tracker.trace_decorator
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                return await self._trace_custom_execution(func, args, kwargs, name, custom_type, trace_variables)
+                async_wrapper.metadata = metadata
+                self.gt = kwargs.get('gt', None) if kwargs else None
+                return await self._trace_custom_execution(
+                    func, name or func.__name__, custom_type, version, trace_variables, *args, **kwargs
+                )
 
+            @self.file_tracker.trace_decorator
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                if self.is_active:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # Create a new event loop for this thread
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        try:
-                            return new_loop.run_until_complete(self._trace_custom_execution(func, args, kwargs, name, custom_type, trace_variables))
-                        finally:
-                            new_loop.close()
-                            asyncio.set_event_loop(loop)
-                    else:
-                        return loop.run_until_complete(self._trace_custom_execution(func, args, kwargs, name, custom_type, trace_variables))
-                else:
-                    return func(*args, **kwargs)
+                sync_wrapper.metadata = metadata
+                self.gt = kwargs.get('gt', None) if kwargs else None
+                return self._trace_sync_custom_execution(
+                    func, name or func.__name__, custom_type, version, trace_variables, *args, **kwargs
+                )
 
-            return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+            wrapper = async_wrapper if is_async else sync_wrapper
+            wrapper.metadata = metadata
+            return wrapper
+
         return decorator
 
-    async def _trace_custom_execution(self, func, args, kwargs, name=None, custom_type=None, trace_variables=True):
-        """Execute a function with tracing"""
-        if not self.is_active:
-            if asyncio.iscoroutinefunction(func):
-                return await func(*args, **kwargs)
-            return func(*args, **kwargs)
-
-        if not self.auto_instrument_custom:
-            if asyncio.iscoroutinefunction(func):
-                return await func(*args, **kwargs)
+    def _trace_sync_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
+        """Synchronous version of custom tracing"""
+        if not self.is_active or not self.auto_instrument_custom:
             return func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
+        hash_id = generate_unique_hash_simple(func)
         variable_traces = []
 
         # Set up variable tracing if enabled
-        def trace_variables_func(frame, event, arg):
-            if event == 'line' and frame.f_code == func.__code__:
-                try:
-                    # Get local variables, excluding special names
-                    locals_dict = {}
-                    for key, value in frame.f_locals.items():
-                        if not key.startswith('__'):
-                            try:
-                                # Include all data types
-                                if isinstance(value, (int, float, bool, str)):
-                                    locals_dict[key] = value
-                                elif isinstance(value, (list, dict, tuple, set)):
-                                    locals_dict[key] = value
-                                else:
-                                    locals_dict[key] = str(value)
-                            except:
-                                pass
-
-                    # Only record if we have variables to track
-                    if locals_dict:
-                        variable_traces.append({
-                            'variables': locals_dict,
-                            'timestamp': datetime.now().astimezone().isoformat()
-                        })
-                except Exception:
-                    pass  # Skip any errors in tracing
-            return trace_variables_func
-
-        # Start tracking network calls
-        self.start_component(component_id)
-
-        # Enable line tracing if requested
         if trace_variables:
+            def trace_variables_func(frame, event, arg):
+                if event == 'line' and frame.f_code == func.__code__:
+                    try:
+                        locals_dict = {k: v for k, v in frame.f_locals.items() 
+                                     if not k.startswith('__') and isinstance(v, (int, float, bool, str, list, dict, tuple, set))}
+                        if locals_dict:
+                            variable_traces.append({
+                                'variables': locals_dict,
+                                'timestamp': datetime.now().astimezone().isoformat()
+                            })
+                    except:
+                        pass
+                return trace_variables_func
+
             sys.settrace(trace_variables_func)
+
+        # Start tracking network calls for this component
+        self.start_component(component_id)
 
         try:
             # Execute the function
-            if asyncio.iscoroutinefunction(func):
-                result = await func(*args, **kwargs)
-            else:
-                result = func(*args, **kwargs)
+            result = func(*args, **kwargs)
 
             # Calculate resource usage
             end_time = datetime.now().astimezone()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
-            # Create component
-            component = self.create_custom_component(
+            # End tracking network calls for this component
+            self.end_component(component_id)
+
+            # Create custom component
+            custom_component = self.create_custom_component(
                 component_id=component_id,
-                hash_id=generate_unique_hash_simple(func),
-                name=name or func.__name__,
-                custom_type=custom_type or "function",
-                version="1.0.0",
+                hash_id=hash_id,
+                name=name,
+                custom_type=custom_type,
+                version=version,
+                memory_used=memory_used,
                 start_time=start_time,
                 end_time=end_time,
-                memory_used=memory_used,
-                variable_traces=variable_traces if trace_variables else [],
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
-                output_data=self._sanitize_output(result),
-                error=None
+                output_data=self._sanitize_output(result)
             )
 
-            self.add_component(component)
+            self.add_component(custom_component)
             return result
 
         except Exception as e:
-            # Calculate resource usage even if there's an error
-            end_time = datetime.now().astimezone()
-            end_memory = psutil.Process().memory_info().rss
-            memory_used = max(0, end_memory - start_memory)
-
-            # Create error component
-            error = {
+            error_component = {
                 "code": 500,
                 "type": type(e).__name__,
                 "message": str(e),
                 "details": {}
             }
-
-            component = self.create_custom_component(
+            
+            # End tracking network calls for this component
+            self.end_component(component_id)
+            
+            end_time = datetime.now().astimezone()
+            
+            custom_component = self.create_custom_component(
                 component_id=component_id,
-                hash_id=generate_unique_hash_simple(func),
-                name=name or func.__name__,
-                custom_type=custom_type or "function",
-                version="1.0.0",
+                hash_id=hash_id,
+                name=name,
+                custom_type=custom_type,
+                version=version,
+                memory_used=0,
+                start_time=start_time,
+                end_time=end_time,
+                variable_traces=variable_traces,
+                input_data=self._sanitize_input(args, kwargs),
+                output_data=None,
+                error=error_component
+            )
+
+            self.add_component(custom_component)
+            raise
+        finally:
+            if trace_variables:
+                sys.settrace(None)
+
+    async def _trace_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
+        """Asynchronous version of custom tracing"""
+        if not self.is_active or not self.auto_instrument_custom:
+            return await func(*args, **kwargs)
+
+        start_time = datetime.now().astimezone()
+        start_memory = psutil.Process().memory_info().rss
+        component_id = str(uuid.uuid4())
+        hash_id = generate_unique_hash_simple(func)
+        variable_traces = []
+
+        # Set up variable tracing if enabled
+        if trace_variables:
+            def trace_variables_func(frame, event, arg):
+                if event == 'line' and frame.f_code == func.__code__:
+                    try:
+                        locals_dict = {k: v for k, v in frame.f_locals.items() 
+                                     if not k.startswith('__') and isinstance(v, (int, float, bool, str, list, dict, tuple, set))}
+                        if locals_dict:
+                            variable_traces.append({
+                                'variables': locals_dict,
+                                'timestamp': datetime.now().astimezone().isoformat()
+                            })
+                    except:
+                        pass
+                return trace_variables_func
+
+            sys.settrace(trace_variables_func)
+
+        try:
+            # Execute the function
+            result = await func(*args, **kwargs)
+
+            # Calculate resource usage
+            end_time = datetime.now().astimezone()
+            end_memory = psutil.Process().memory_info().rss
+            memory_used = max(0, end_memory - start_memory)
+
+            # Create custom component
+            custom_component = self.create_custom_component(
+                component_id=component_id,
+                hash_id=hash_id,
+                name=name,
+                custom_type=custom_type,
+                version=version,
                 start_time=start_time,
                 end_time=end_time,
                 memory_used=memory_used,
-                variable_traces=variable_traces if trace_variables else [],
+                variable_traces=variable_traces,
+                input_data=self._sanitize_input(args, kwargs),
+                output_data=self._sanitize_output(result)
+            )
+            self.add_component(custom_component)
+            return result
+
+        except Exception as e:
+            error_component = {
+                "code": 500,
+                "type": type(e).__name__,
+                "message": str(e),
+                "details": {}
+            }
+            
+            end_time = datetime.now().astimezone()
+            
+            custom_component = self.create_custom_component(
+                component_id=component_id,
+                hash_id=hash_id,
+                name=name,
+                custom_type=custom_type,
+                version=version,
+                start_time=start_time,
+                end_time=end_time,
+                memory_used=0,
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
-                error=error
+                error=error_component
             )
-
-            self.add_component(component)
+            self.add_component(custom_component)
             raise
-
         finally:
-            # Disable line tracing if it was enabled
             if trace_variables:
                 sys.settrace(None)
-            # End tracking network calls
-            self.end_component(component_id)
-
-    # Add auto instrumentation methods
-    def instrument_custom_calls(self):
-        self.auto_instrument_custom = True
-
-    def instrument_user_interaction_calls(self):
-        self.auto_instrument_user_interaction = True
-
-    def instrument_network_calls(self):
-        self.auto_instrument_network = True
 
     def create_custom_component(self, **kwargs):
-
         """Create a custom component according to the data structure"""
         start_time = kwargs["start_time"]
         
@@ -206,10 +257,10 @@ class CustomTracerMixin:
         if self.auto_instrument_user_interaction:
             interactions = self.component_user_interaction.get(kwargs["component_id"], [])
 
-
         component = {
             "id": kwargs["component_id"],
             "hash_id": kwargs["hash_id"],
+            "source_hash_id": None,
             "type": "custom",
             "name": kwargs["name"],
             "start_time": start_time.isoformat(),
@@ -217,14 +268,14 @@ class CustomTracerMixin:
             "error": kwargs.get("error"),
             "parent_id": self.current_agent_id.get() if hasattr(self, 'current_agent_id') else None,
             "info": {
-                "custom_type": kwargs.get("custom_type", "generic"),
-                "version": kwargs.get("version", "1.0.0"),
-                "memory_used": kwargs.get("memory_used", 0)
+                "custom_type": kwargs["custom_type"],
+                "version": kwargs["version"],
+                "memory_used": kwargs["memory_used"]
             },
             "data": {
-                "input": kwargs.get("input_data"),
-                "output": kwargs.get("output_data"),
-                "memory_used": kwargs.get("memory_used", 0),
+                "input": kwargs["input_data"],
+                "output": kwargs["output_data"],
+                "memory_used": kwargs["memory_used"],
                 "variable_traces": kwargs.get("variable_traces", [])
             },
             "network_calls": network_calls,
@@ -244,20 +295,31 @@ class CustomTracerMixin:
         """End tracking network calls for a component"""
         pass
 
-    def _sanitize_input(self, args, kwargs):
-        """Sanitize input data for storage"""
-        try:
-            sanitized_args = [arg if isinstance(arg, (int, float, bool, str, list, dict, tuple, set)) else str(arg) for arg in args]
-            sanitized_kwargs = {k: v if isinstance(v, (int, float, bool, str, list, dict, tuple, set)) else str(v) for k, v in kwargs.items()}
-            return {"args": sanitized_args, "kwargs": sanitized_kwargs}
-        except:
-            return None
+    def _sanitize_input(self, args: tuple, kwargs: dict) -> Dict:
+        """Sanitize and format input data"""
+        return {
+            "args": [str(arg) if not isinstance(arg, (int, float, bool, str, list, dict)) else arg for arg in args],
+            "kwargs": {
+                k: str(v) if not isinstance(v, (int, float, bool, str, list, dict)) else v 
+                for k, v in kwargs.items()
+            }
+        }
 
-    def _sanitize_output(self, result):
-        """Sanitize output data for storage"""
-        try:
-            if isinstance(result, (int, float, bool, str, list, dict, tuple, set)):
-                return result
-            return str(result)
-        except:
-            return None
+    def _sanitize_output(self, output: Any) -> Any:
+        """Sanitize and format output data"""
+        if isinstance(output, (int, float, bool, str, list, dict)):
+            return output
+        return str(output)
+
+    # Auto instrumentation methods
+    def instrument_custom_calls(self):
+        """Enable auto-instrumentation for custom calls"""
+        self.auto_instrument_custom = True
+
+    def instrument_user_interaction_calls(self):
+        """Enable auto-instrumentation for user interaction calls"""
+        self.auto_instrument_user_interaction = True
+
+    def instrument_network_calls(self):
+        """Enable auto-instrumentation for network calls"""
+        self.auto_instrument_network = True
