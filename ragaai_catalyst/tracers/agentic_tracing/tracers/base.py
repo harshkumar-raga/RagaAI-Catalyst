@@ -22,6 +22,14 @@ from ..upload.upload_code import upload_code
 from ..utils.file_name_tracker import TrackName
 from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
 
+
+# Configure logging to show debug messages (which includes info messages as well)
+import logging
+logger = logging.getLogger(__name__)
+logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
+
+
+
 class TracerJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
@@ -199,8 +207,9 @@ class BaseTracer:
 
             with open(filepath, 'w') as f:
                 json.dump(cleaned_trace_data, f, cls=TracerJSONEncoder, indent=2)
-                
-            print(f"Trace saved to {filepath}")
+
+            logger.info(" Traces saved successfully.")
+            logger.debug(f"Trace saved to {filepath}")
             # Upload traces
             json_file_path = str(filepath)
             project_name = self.project_name
