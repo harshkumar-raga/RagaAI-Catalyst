@@ -75,7 +75,6 @@ class ToolTracerMixin:
             result = func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -91,7 +90,6 @@ class ToolTracerMixin:
                 version=version,
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=self._sanitize_output(result)
             )
@@ -110,8 +108,6 @@ class ToolTracerMixin:
             # End tracking network calls for this component
             self.end_component(component_id)
             
-            end_time = datetime.now().astimezone()
-            
             tool_component = self.create_tool_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -120,7 +116,6 @@ class ToolTracerMixin:
                 version=version,
                 memory_used=0,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
                 error=error_component
@@ -144,7 +139,6 @@ class ToolTracerMixin:
             result = await func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -156,7 +150,6 @@ class ToolTracerMixin:
                 tool_type=tool_type,
                 version=version,
                 start_time=start_time,
-                end_time=end_time,
                 memory_used=memory_used,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=self._sanitize_output(result)
@@ -172,8 +165,6 @@ class ToolTracerMixin:
                 "details": {}
             }
             
-            end_time = datetime.now().astimezone()
-            
             tool_component = self.create_tool_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -181,7 +172,6 @@ class ToolTracerMixin:
                 tool_type=tool_type,
                 version=version,
                 start_time=start_time,
-                end_time=end_time,
                 memory_used=0,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
@@ -202,7 +192,7 @@ class ToolTracerMixin:
             "type": "tool",
             "name": kwargs["name"],
             "start_time": start_time.isoformat(),
-            "end_time": kwargs["end_time"].isoformat(),
+            "end_time": datetime.now().astimezone().isoformat(),
             "error": kwargs.get("error"),
             "parent_id": self.current_agent_id.get(),
             "info": {

@@ -250,7 +250,7 @@ class LLMTracerMixin:
             setattr(obj, method_name, wrapped_method)
             self.patches.append((obj, method_name, original_method))
 
-    def create_llm_component(self, component_id, hash_id, name, llm_type, version, memory_used, start_time, end_time, input_data, output_data, cost={}, usage={}, error=None, parameters={}):
+    def create_llm_component(self, component_id, hash_id, name, llm_type, version, memory_used, start_time, input_data, output_data, cost={}, usage={}, error=None, parameters={}):
         # Update total metrics
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
@@ -278,7 +278,7 @@ class LLMTracerMixin:
             "type": "llm",
             "name": name,
             "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
+            "end_time": datetime.now().astimezone().isoformat(),
             "error": error,
             "parent_id": self.current_agent_id.get(),
             "info": {
@@ -332,7 +332,6 @@ class LLMTracerMixin:
             result = await original_func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -359,7 +358,6 @@ class LLMTracerMixin:
                 version="1.0.0",
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=input_data,
                 output_data=extract_llm_output(result),
                 cost=cost,
@@ -381,8 +379,6 @@ class LLMTracerMixin:
             
             # End tracking network calls for this component
             self.end_component(component_id)
-            
-            end_time = datetime.now().astimezone()
 
             name = self.current_llm_call_name.get()
             if name is None:
@@ -396,7 +392,6 @@ class LLMTracerMixin:
                 version="1.0.0",
                 memory_used=0,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=extract_input_data(args, kwargs, None),
                 output_data=None,
                 error=error_component
@@ -420,7 +415,6 @@ class LLMTracerMixin:
         self.start_component(component_id)
 
         # Calculate resource usage
-        end_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
 
         try:
@@ -456,7 +450,6 @@ class LLMTracerMixin:
                 version="1.0.0",
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=input_data,
                 output_data=extract_llm_output(result),
                 cost=cost,
@@ -477,8 +470,6 @@ class LLMTracerMixin:
             
             # End tracking network calls for this component
             self.end_component(component_id)
-            
-            end_time = datetime.now().astimezone()
 
             name = self.current_llm_call_name.get()
             if name is None:
@@ -495,7 +486,6 @@ class LLMTracerMixin:
                 version="1.0.0",
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=extract_input_data(args, kwargs, None),
                 output_data=None,
                 error=error_component
