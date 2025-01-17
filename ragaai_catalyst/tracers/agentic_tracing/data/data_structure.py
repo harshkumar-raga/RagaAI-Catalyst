@@ -173,7 +173,7 @@ class LLMCall:
     duration: float = field(default=0)
 
 class Component:
-    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Dict[str, Any]={}, data: Dict[str, Any]={}, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Optional[Dict[str, Any]] = None, data: Dict[str, Any]={}, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
         self.id = id
         self.hash_id = hash_id
         self.source_hash_id = source_hash_id
@@ -223,15 +223,15 @@ class Component:
         }
 
 class LLMComponent(Component):
-    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], extra_info: Optional[Dict[str, Any]] = None, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
         super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, extra_info, data, network_calls, interactions, error)
 
 class AgentComponent(Component):
-    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], extra_info: Optional[Dict[str, Any]] = None, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
         super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, extra_info, data, network_calls, interactions, error)
 
 class ToolComponent(Component):
-    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], extra_info: Optional[Dict[str, Any]] = None, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
         super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, extra_info, data, network_calls, interactions, error)
 
 @dataclass
