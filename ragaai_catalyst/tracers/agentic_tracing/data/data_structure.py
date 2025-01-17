@@ -173,7 +173,26 @@ class LLMCall:
     duration: float = field(default=0)
 
 class Component:
-    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, 
+        id: str, 
+        hash_id: str, 
+        source_hash_id: str, 
+        type: str, 
+        name: str, 
+        start_time: str, 
+        end_time: str, 
+        parent_id: int, 
+        info: Dict[str, Any], 
+        data: Dict[str, Any], 
+        metadata: Optional[Dict[str, Any]] = None, 
+        metrics: Optional[List[Dict[str, Any]]] = None, 
+        feedback: Optional[Any] = None,
+        network_calls: Optional[List[NetworkCall]] = None, 
+        interactions: Optional[List[Union[Interaction, Dict]]] = None, 
+        error: Optional[Dict[str, Any]] = None
+        ):
         self.id = id
         self.hash_id = hash_id
         self.source_hash_id = source_hash_id
@@ -188,6 +207,9 @@ class Component:
         self.network_calls = network_calls or []
         self.interactions = []
         self.error = error
+        self.metadata = metadata or {}
+        self.metrics = metrics or []
+        self.feedback = feedback
         if interactions:
             for interaction in interactions:
                 if isinstance(interaction, dict):
@@ -216,6 +238,9 @@ class Component:
             "error": self.error,
             "data": self.data,
             "error": self.error,
+            "metadata": self.metadata,
+            "metrics": self.metrics,
+            "feedback": self.feedback,
             "network_calls": [call.to_dict() if hasattr(call, 'to_dict') else call for call in self.network_calls],
             "interactions": self.interactions
         }

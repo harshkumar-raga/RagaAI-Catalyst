@@ -6,7 +6,7 @@ import psutil
 import pkg_resources
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Any
 import uuid
 import sys
 import tempfile
@@ -20,8 +20,10 @@ from ..data.data_structure import (
 
 from ..upload.upload_agentic_traces import UploadAgenticTraces
 from ..upload.upload_code import upload_code
+from ..upload.upload_trace_metric import upload_trace_metric
 from ..utils.file_name_tracker import TrackName
 from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
+from ..utils.span_attributes import SpanAttributes
 
 
 # Configure logging to show debug messages (which includes info messages as well)
@@ -52,6 +54,8 @@ class TracerJSONEncoder(json.JSONEncoder):
         except:
             return None  # Last resort: return None instead of failing
 
+
+
 class BaseTracer:
     def __init__(self, user_details):
         self.user_details = user_details
@@ -65,6 +69,7 @@ class BaseTracer:
         self.start_time = None 
         self.components: List[Component] = []
         self.file_tracker = TrackName()
+        self.span_attributes_dict = {}
         
     def _get_system_info(self) -> SystemInfo:
         # Get OS info
@@ -187,6 +192,8 @@ class BaseTracer:
             self.trace = self._change_span_ids_to_int(self.trace)
             self.trace = self._change_agent_input_output(self.trace)
             self.trace = self._extract_cost_tokens(self.trace)
+
+            self.trace = self._add_span_attributes_to_trace(self.trace)
             
             # Create traces directory if it doesn't exist
             self.traces_dir = tempfile.gettempdir()
@@ -214,12 +221,22 @@ class BaseTracer:
             logger.info(" Traces saved successfully.")
             logger.debug(f"Trace saved to {filepath}")
             # Upload traces
+
             json_file_path = str(filepath)
             project_name = self.project_name
             project_id = self.project_id 
             dataset_name = self.dataset_name
             user_detail = self.user_details
             base_url = os.getenv('RAGAAI_CATALYST_BASE_URL')
+
+            ##Upload trace metrics
+            response = upload_trace_metric(
+                json_file_path=json_file_path,
+                dataset_name=self.dataset_name,
+                project_name=self.project_name
+            )
+
+            # Upload traces
             upload_traces = UploadAgenticTraces(
                 json_file_path=json_file_path,
                 project_name=project_name,
@@ -385,6 +402,68 @@ class BaseTracer:
                 data['spans'] = deduplicate_spans(data['spans'])
         
         return trace
+    
+    def add_tags(self, tags: List[str]):
+        raise NotImplementedError
+
+    def _add_span_attributes_to_trace(self, trace):
+        if not hasattr(trace, 'data'):
+            return trace
+        for data in trace.data:
+            for span in data.get('spans', []):
+                if not hasattr(span, 'name'):
+                    continue
+                span_name = span.name
+                if span_name in self.span_attributes_dict:
+                    span_attributes = self.span_attributes_dict[span_name]
+                    span = self._add_span_attributes_to_span(span_attributes, span)
+                if hasattr(span, 'type'):
+                    if span.type == 'agent':
+                        if hasattr(span, 'data'):
+                            if 'children' in span.data:
+                                span.data['children'] = self._add_span_attributes_to_children(span_attributes, span.data['children'])
+
+
+        return trace
+
+    def _add_span_attributes_to_children(self, span_attributes: SpanAttributes, children):
+        attributed_children = []
+        for child in children:
+            if 'name' not in child:
+                continue
+            child_name = child['name']
+            if child_name in self.span_attributes_dict:
+                span_attributes = self.span_attributes_dict[child_name]
+                child = self._add_span_attributes_to_span(span_attributes, child)
+            if 'type' in child:
+                if child['type'] == 'agent':
+                    if 'data' in child:
+                        if 'children' in child['data']:
+                            child['data']['children'] = self._add_span_attributes_to_children(span_attributes, child['data']['children'])
+            attributed_children.append(child)
+        return attributed_children
+
+    def _add_span_attributes_to_span(self, span_attributes: SpanAttributes, span):
+        metadata = {
+            'tags': span_attributes.tags,
+            'user_metadata': span_attributes.metadata
+        }
+        metrics = span_attributes.metrics
+        feedback = span_attributes.feedback
+        if isinstance(span, dict):
+            span['metadata'] = metadata
+            span['metrics'] = metrics
+            span['feedback'] = feedback
+        else:
+            span.metadata = metadata
+            span.metrics = metrics
+            span.feedback = feedback
+        return span
+
+    def span(self, span_name):
+        if span_name not in self.span_attributes_dict:
+            self.span_attributes_dict[span_name] = SpanAttributes(span_name)
+        return self.span_attributes_dict[span_name]
 
     def format_interactions(self) -> dict:
         """

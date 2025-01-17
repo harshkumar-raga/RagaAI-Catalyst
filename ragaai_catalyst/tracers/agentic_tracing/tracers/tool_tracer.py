@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 import psutil
@@ -7,6 +8,10 @@ from ..utils.unique_decorator import generate_unique_hash_simple
 import contextvars
 import asyncio
 from ..utils.file_name_tracker import TrackName
+from ..utils.span_attributes import SpanAttributes
+import logging
+logger = logging.getLogger(__name__)
+logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") else logger.setLevel(logging.INFO)
 
 
 class ToolTracerMixin:
@@ -23,7 +28,6 @@ class ToolTracerMixin:
         self.auto_instrument_tool = False
         self.auto_instrument_user_interaction = False
         self.auto_instrument_network = False
-
     # take care of auto_instrument
     def instrument_tool_calls(self):
         self.auto_instrument_tool = True
@@ -32,7 +36,33 @@ class ToolTracerMixin:
     def instrument_network_calls(self):
         self.auto_instrument_network = True
 
-    def trace_tool(self, name: str, tool_type: str = "generic", version: str = None):
+
+    def trace_tool(self, name: str, tool_type: str = "generic", version: str = "1.0.0", tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
+        if name not in self.span_attributes_dict:
+            self.span_attributes_dict[name] = SpanAttributes(name)
+        if tags:
+            self.span(name).add_tags(tags)
+        if metadata:
+            self.span(name).add_metadata(metadata)
+        if metrics:
+            if isinstance(metrics, dict):
+                metrics = [metrics]
+            for metric in metrics:
+                try:
+                    self.span(name).add_metrics(
+                        name = metric['name'], 
+                        score = metric['score'], 
+                        reasoning = metric.get('reasoning', ''), 
+                        cost = metric.get('cost', None), 
+                        latency = metric.get('latency', None), 
+                        metadata = metric.get('metadata', {}), 
+                        config = metric.get('config', {})
+                    )
+                except KeyError as e:
+                    logger.error(f"Error adding metric: {e}")
+        if feedback:
+            self.span(name).add_feedback(feedback)
+
         def decorator(func):
             # Add metadata attribute to the function
             metadata = {
