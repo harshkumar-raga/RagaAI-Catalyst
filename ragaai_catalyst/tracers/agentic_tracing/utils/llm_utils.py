@@ -136,10 +136,19 @@ def calculate_llm_cost(token_usage, model_name, model_costs):
         }
 
     # Get model costs, defaulting to default costs if unknown
-    model_cost = model_costs.get(model_name, {
+    model_cost = model_cost = model_costs.get(model_name, {
         "input_cost_per_token": 0.0,   
         "output_cost_per_token": 0.0   
     })
+    if model_cost['input_cost_per_token'] == 0.0 and model_cost['output_cost_per_token'] == 0.0:
+        provide_name = model_name.split('-')[0]
+        if provide_name == 'azure':
+            model_name = os.path.join('azure', '-'.join(model_name.split('-')[1:]))
+
+            model_cost = model_costs.get(model_name, {
+                "input_cost_per_token": 0.0,   
+                "output_cost_per_token": 0.0   
+            })
 
     input_cost = (token_usage.get("prompt_tokens", 0)) * model_cost.get("input_cost_per_token", 0.0)
     output_cost = (token_usage.get("completion_tokens", 0)) * model_cost.get("output_cost_per_token", 0.0)

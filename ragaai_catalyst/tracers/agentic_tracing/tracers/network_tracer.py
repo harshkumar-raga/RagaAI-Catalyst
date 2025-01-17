@@ -47,6 +47,8 @@ class NetworkTracer:
                 "url": url,
                 "method": method,
                 "status_code": status_code,
+                "start_time": start_time.isoformat() if start_time else None,
+                "end_time": end_time.isoformat() if end_time else None,
                 "response_time": duration,
                 "bytes_sent": bytes_sent,
                 "bytes_received": bytes_received,
