@@ -1,75 +1,40 @@
-import os
+import sys
 import uuid
-from datetime import datetime
 import psutil
+import threading
+from datetime import datetime
 import functools
 from typing import Optional, Any, Dict, List
-from ..utils.unique_decorator import generate_unique_hash_simple
+from ..utils.unique_decorator import generate_unique_hash_simple, mydecorator
 import contextvars
 import asyncio
 from ..utils.file_name_tracker import TrackName
-from ..utils.span_attributes import SpanAttributes
-import logging
-logger = logging.getLogger(__name__)
-logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") else logger.setLevel(logging.INFO)
 
 
-class ToolTracerMixin:
+class CustomTracerMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.file_tracker = TrackName()
-        self.current_tool_name = contextvars.ContextVar("tool_name", default=None)
-        self.current_tool_id = contextvars.ContextVar("tool_id", default=None)
+        self.current_custom_name = contextvars.ContextVar("custom_name", default=None)
+        self.current_custom_id = contextvars.ContextVar("custom_id", default=None)
         self.component_network_calls = {}
         self.component_user_interaction = {}
         self.gt = None
 
-        # add auto_instrument option
-        self.auto_instrument_tool = False
+        # Add auto instrument flags
+        self.auto_instrument_custom = False
         self.auto_instrument_user_interaction = False
         self.auto_instrument_network = False
-    # take care of auto_instrument
-    def instrument_tool_calls(self):
-        self.auto_instrument_tool = True
-    def instrument_user_interaction_calls(self):
-        self.auto_instrument_user_interaction = True
-    def instrument_network_calls(self):
-        self.auto_instrument_network = True
 
-
-    def trace_tool(self, name: str, tool_type: str = "generic", version: str = "1.0.0", tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
-        if name not in self.span_attributes_dict:
-            self.span_attributes_dict[name] = SpanAttributes(name)
-        if tags:
-            self.span(name).add_tags(tags)
-        if metadata:
-            self.span(name).add_metadata(metadata)
-        if metrics:
-            if isinstance(metrics, dict):
-                metrics = [metrics]
-            for metric in metrics:
-                try:
-                    self.span(name).add_metrics(
-                        name = metric['name'], 
-                        score = metric['score'], 
-                        reasoning = metric.get('reasoning', ''), 
-                        cost = metric.get('cost', None), 
-                        latency = metric.get('latency', None), 
-                        metadata = metric.get('metadata', {}), 
-                        config = metric.get('config', {})
-                    )
-                except KeyError as e:
-                    logger.error(f"Error adding metric: {e}")
-        if feedback:
-            self.span(name).add_feedback(feedback)
-
+    def trace_custom(self, name: str = None, custom_type: str = "generic", version: str = "1.0.0", trace_variables: bool = True):
         def decorator(func):
             # Add metadata attribute to the function
             metadata = {
-                "name": name,
-                "tool_type": tool_type,
+                "name": name or func.__name__,
+                "custom_type": custom_type,
                 "version": version,
-                "is_active": self.is_active
+                "trace_variables": trace_variables,
+                "is_active": True
             }
             
             # Check if the function is async
@@ -80,8 +45,8 @@ class ToolTracerMixin:
             async def async_wrapper(*args, **kwargs):
                 async_wrapper.metadata = metadata
                 self.gt = kwargs.get('gt', None) if kwargs else None
-                return await self._trace_tool_execution(
-                    func, name, tool_type, version, *args, **kwargs
+                return await self._trace_custom_execution(
+                    func, name or func.__name__, custom_type, version, trace_variables, *args, **kwargs
                 )
 
             @self.file_tracker.trace_decorator
@@ -89,8 +54,8 @@ class ToolTracerMixin:
             def sync_wrapper(*args, **kwargs):
                 sync_wrapper.metadata = metadata
                 self.gt = kwargs.get('gt', None) if kwargs else None
-                return self._trace_sync_tool_execution(
-                    func, name, tool_type, version, *args, **kwargs
+                return self._trace_sync_custom_execution(
+                    func, name or func.__name__, custom_type, version, trace_variables, *args, **kwargs
                 )
 
             wrapper = async_wrapper if is_async else sync_wrapper
@@ -99,24 +64,40 @@ class ToolTracerMixin:
 
         return decorator
 
-    def _trace_sync_tool_execution(self, func, name, tool_type, version, *args, **kwargs):
-        """Synchronous version of tool tracing"""
-        if not self.is_active:
-            return func(*args, **kwargs)
-        
-        if not self.auto_instrument_tool:
+    def _trace_sync_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
+        """Synchronous version of custom tracing"""
+        if not self.is_active or not self.auto_instrument_custom:
             return func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
+        variable_traces = []
+
+        # Set up variable tracing if enabled
+        if trace_variables:
+            def trace_variables_func(frame, event, arg):
+                if event == 'line' and frame.f_code == func.__code__:
+                    try:
+                        locals_dict = {k: v for k, v in frame.f_locals.items() 
+                                     if not k.startswith('__') and isinstance(v, (int, float, bool, str, list, dict, tuple, set))}
+                        if locals_dict:
+                            variable_traces.append({
+                                'variables': locals_dict,
+                                'timestamp': datetime.now().astimezone().isoformat()
+                            })
+                    except:
+                        pass
+                return trace_variables_func
+
+            sys.settrace(trace_variables_func)
 
         # Start tracking network calls for this component
         self.start_component(component_id)
 
         try:
-            # Execute the tool
+            # Execute the function
             result = func(*args, **kwargs)
 
             # Calculate resource usage
@@ -127,21 +108,22 @@ class ToolTracerMixin:
             # End tracking network calls for this component
             self.end_component(component_id)
 
-            # Create tool component
-            tool_component = self.create_tool_component(
+            # Create custom component
+            custom_component = self.create_custom_component(
                 component_id=component_id,
                 hash_id=hash_id,
                 name=name,
-                tool_type=tool_type,
+                custom_type=custom_type,
                 version=version,
                 memory_used=memory_used,
                 start_time=start_time,
                 end_time=end_time,
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=self._sanitize_output(result)
             )
 
-            self.add_component(tool_component)
+            self.add_component(custom_component)
             return result
 
         except Exception as e:
@@ -157,38 +139,58 @@ class ToolTracerMixin:
             
             end_time = datetime.now().astimezone()
             
-            tool_component = self.create_tool_component(
+            custom_component = self.create_custom_component(
                 component_id=component_id,
                 hash_id=hash_id,
                 name=name,
-                tool_type=tool_type,
+                custom_type=custom_type,
                 version=version,
                 memory_used=0,
                 start_time=start_time,
                 end_time=end_time,
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
                 error=error_component
             )
 
-            self.add_component(tool_component)
+            self.add_component(custom_component)
             raise
+        finally:
+            if trace_variables:
+                sys.settrace(None)
 
-    async def _trace_tool_execution(self, func, name, tool_type, version, *args, **kwargs):
-        """Asynchronous version of tool tracing"""
-        if not self.is_active:
-            return await func(*args, **kwargs)
-
-        if not self.auto_instrument_tool:
+    async def _trace_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
+        """Asynchronous version of custom tracing"""
+        if not self.is_active or not self.auto_instrument_custom:
             return await func(*args, **kwargs)
 
         start_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
+        variable_traces = []
+
+        # Set up variable tracing if enabled
+        if trace_variables:
+            def trace_variables_func(frame, event, arg):
+                if event == 'line' and frame.f_code == func.__code__:
+                    try:
+                        locals_dict = {k: v for k, v in frame.f_locals.items() 
+                                     if not k.startswith('__') and isinstance(v, (int, float, bool, str, list, dict, tuple, set))}
+                        if locals_dict:
+                            variable_traces.append({
+                                'variables': locals_dict,
+                                'timestamp': datetime.now().astimezone().isoformat()
+                            })
+                    except:
+                        pass
+                return trace_variables_func
+
+            sys.settrace(trace_variables_func)
 
         try:
-            # Execute the tool
+            # Execute the function
             result = await func(*args, **kwargs)
 
             # Calculate resource usage
@@ -196,20 +198,21 @@ class ToolTracerMixin:
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
-            # Create tool component
-            tool_component = self.create_tool_component(
+            # Create custom component
+            custom_component = self.create_custom_component(
                 component_id=component_id,
                 hash_id=hash_id,
                 name=name,
-                tool_type=tool_type,
+                custom_type=custom_type,
                 version=version,
                 start_time=start_time,
                 end_time=end_time,
                 memory_used=memory_used,
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=self._sanitize_output(result)
             )
-            self.add_component(tool_component)
+            self.add_component(custom_component)
             return result
 
         except Exception as e:
@@ -222,65 +225,74 @@ class ToolTracerMixin:
             
             end_time = datetime.now().astimezone()
             
-            tool_component = self.create_tool_component(
+            custom_component = self.create_custom_component(
                 component_id=component_id,
                 hash_id=hash_id,
                 name=name,
-                tool_type=tool_type,
+                custom_type=custom_type,
                 version=version,
                 start_time=start_time,
                 end_time=end_time,
                 memory_used=0,
+                variable_traces=variable_traces,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
                 error=error_component
             )
-            self.add_component(tool_component)
+            self.add_component(custom_component)
             raise
+        finally:
+            if trace_variables:
+                sys.settrace(None)
 
-    def create_tool_component(self, **kwargs):
-        """Create a tool component according to the data structure"""
+    def create_custom_component(self, **kwargs):
+        """Create a custom component according to the data structure"""
+        start_time = kwargs["start_time"]
+        
         network_calls = []
         if self.auto_instrument_network:
             network_calls = self.component_network_calls.get(kwargs["component_id"], [])
+            
         interactions = []
         if self.auto_instrument_user_interaction:
             interactions = self.component_user_interaction.get(kwargs["component_id"], [])
 
-        start_time = kwargs["start_time"]
         component = {
             "id": kwargs["component_id"],
             "hash_id": kwargs["hash_id"],
             "source_hash_id": None,
-            "type": "tool",
+            "type": "custom",
             "name": kwargs["name"],
             "start_time": start_time.isoformat(),
             "end_time": kwargs["end_time"].isoformat(),
             "error": kwargs.get("error"),
-            "parent_id": self.current_agent_id.get(),
+            "parent_id": self.current_agent_id.get() if hasattr(self, 'current_agent_id') else None,
             "info": {
-                "tool_type": kwargs["tool_type"],
+                "custom_type": kwargs["custom_type"],
                 "version": kwargs["version"],
                 "memory_used": kwargs["memory_used"]
             },
             "data": {
                 "input": kwargs["input_data"],
                 "output": kwargs["output_data"],
-                "memory_used": kwargs["memory_used"]
+                "memory_used": kwargs["memory_used"],
+                "variable_traces": kwargs.get("variable_traces", [])
             },
             "network_calls": network_calls,
             "interactions": interactions
         }
 
-        if self.gt: 
+        if self.gt:
             component["data"]["gt"] = self.gt
 
         return component
 
     def start_component(self, component_id):
+        """Start tracking network calls for a component"""
         self.component_network_calls[component_id] = []
 
     def end_component(self, component_id):
+        """End tracking network calls for a component"""
         pass
 
     def _sanitize_input(self, args: tuple, kwargs: dict) -> Dict:
@@ -298,3 +310,16 @@ class ToolTracerMixin:
         if isinstance(output, (int, float, bool, str, list, dict)):
             return output
         return str(output)
+
+    # Auto instrumentation methods
+    def instrument_custom_calls(self):
+        """Enable auto-instrumentation for custom calls"""
+        self.auto_instrument_custom = True
+
+    def instrument_user_interaction_calls(self):
+        """Enable auto-instrumentation for user interaction calls"""
+        self.auto_instrument_user_interaction = True
+
+    def instrument_network_calls(self):
+        """Enable auto-instrumentation for network calls"""
+        self.auto_instrument_network = True

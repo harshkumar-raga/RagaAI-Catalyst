@@ -23,12 +23,17 @@ class AgentTracerMixin:
         self.agent_children = contextvars.ContextVar("agent_children", default=[])
         self.component_network_calls = contextvars.ContextVar("component_network_calls", default={})
         self.component_user_interaction = contextvars.ContextVar("component_user_interaction", default={})
-        self.version = contextvars.ContextVar("version", default="1.0.0")
+        self.version = contextvars.ContextVar("version", default=None)
         self.agent_type = contextvars.ContextVar("agent_type", default="generic")
         self.capabilities = contextvars.ContextVar("capabilities", default=[])
         self.start_time = contextvars.ContextVar("start_time", default=None)
         self.input_data = contextvars.ContextVar("input_data", default=None)
         self.gt = None
+
+        # Add auto instrument flags
+        self.auto_instrument_agent = False
+        self.auto_instrument_user_interaction = False
+        self.auto_instrument_network = False
 
 
     def trace_agent(self, name: str, agent_type: str = None, version: str = None, capabilities: List[str] = None, tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
@@ -193,6 +198,9 @@ class AgentTracerMixin:
         if not self.is_active:
             return func(*args, **kwargs)
 
+        if not self.auto_instrument_agent:
+            return func(*args, **kwargs)
+
         start_time = datetime.now()
         self.start_time = start_time
         self.input_data = self._sanitize_input(args, kwargs)
@@ -315,6 +323,9 @@ class AgentTracerMixin:
         if not self.is_active:
             return await func(*args, **kwargs)
 
+        if not self.auto_instrument_agent:
+            return await func(*args, **kwargs)
+
         start_time = datetime.now()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
@@ -429,6 +440,12 @@ class AgentTracerMixin:
 
     def create_agent_component(self, **kwargs):
         """Create an agent component according to the data structure"""
+        network_calls = []
+        if self.auto_instrument_network:
+            network_calls = self.component_network_calls.get(kwargs["component_id"], [])
+        interactions = []
+        if self.auto_instrument_user_interaction:
+            interactions = self.component_user_interaction.get(kwargs["component_id"], [])
         start_time = kwargs["start_time"]
         component = {
             "id": kwargs["component_id"],
@@ -451,8 +468,8 @@ class AgentTracerMixin:
                 "output": kwargs["output_data"],
                 "children": kwargs.get("children", [])
             },
-            "network_calls": self.component_network_calls.get(kwargs["component_id"], []),
-            "interactions": self.component_user_interaction.get(kwargs["component_id"], [])
+            "network_calls": network_calls,
+            "interactions": interactions
         }
 
         if self.gt: 
@@ -500,3 +517,12 @@ class AgentTracerMixin:
         if isinstance(output, (int, float, bool, str, list, dict)):
             return output
         return str(output)
+
+    def instrument_agent_calls(self):
+        self.auto_instrument_agent = True
+
+    def instrument_user_interaction_calls(self):
+        self.auto_instrument_user_interaction = True
+
+    def instrument_network_calls(self):
+        self.auto_instrument_network = True

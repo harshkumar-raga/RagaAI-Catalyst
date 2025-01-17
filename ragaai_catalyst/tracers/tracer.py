@@ -21,6 +21,7 @@ from ragaai_catalyst.tracers.utils import get_unique_key
 from ragaai_catalyst import RagaAICatalyst
 from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing, TrackName
 from ragaai_catalyst.tracers.agentic_tracing.tracers.llm_tracer import LLMTracerMixin
+from ragaai_catalyst.tracers.agentic_tracing.utils.trace_utils import load_model_costs, update_model_costs_from_github
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,27 @@ class Tracer(AgenticTracing):
         self,
         project_name,
         dataset_name,
+        trace_name=None,
         tracer_type=None,
         pipeline=None,
         metadata=None,
         description=None,
         upload_timeout=30,  # Default timeout of 30 seconds
+        update_llm_cost=True,  # Parameter to control model cost updates
+        auto_instrumentation={ # to control automatic instrumentation of different components
+            'llm':True,
+            'tool':True,
+            'agent':True,
+            'user_interaction':True,
+            'file_io':True,
+            'network':True,
+            'custom':True
+        }
+        # auto_instrumentation=True/False  # to control automatic instrumentation of everything
+
     ):
         """
-        Initializes a Tracer object.
+        Initializes a Tracer object. 
 
         Args:
             project_name (str): The name of the project.
@@ -49,19 +63,47 @@ class Tracer(AgenticTracing):
             metadata (dict, optional): The metadata. Defaults to None.
             description (str, optional): The description. Defaults to None.
             upload_timeout (int, optional): The upload timeout in seconds. Defaults to 30.
-
-        Returns:
-            None
+            update_llm_cost (bool, optional): Whether to update model costs from GitHub. Defaults to True.
         """
-        # Set auto_instrument_llm to True to enable automatic LLM tracing
+
         user_detail = {
             "project_name": project_name,
             "project_id": None,  # Will be set after project validation
             "dataset_name": dataset_name,
+            "trace_name": trace_name if trace_name else f"trace_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}",
             "trace_user_detail": {"metadata": metadata} if metadata else {}
         }
-        super().__init__(user_detail=user_detail, auto_instrument_llm=True)
-        self.is_active = True
+
+        # take care of auto_instrumentation
+        if isinstance(auto_instrumentation, bool):
+            if auto_instrumentation:
+                auto_instrumentation = {
+                    "llm": True,
+                    "tool": True,
+                    "agent": True,
+                    "user_interaction": True,
+                    "file_io": True,
+                    "network": True,
+                    "custom": True
+                }
+            else:
+                auto_instrumentation = {
+                    "llm": False,
+                    "tool": False,
+                    "agent": False,
+                    "user_interaction": False,
+                    "file_io": False,
+                    "network": False,
+                    "custom": False
+                }
+        elif isinstance(auto_instrumentation, dict):
+            auto_instrumentation = {k: v for k, v in auto_instrumentation.items() if v}
+            for key in ["llm", "tool", "agent", "user_interaction", "file_io", "network", "custom"]:
+                if key not in auto_instrumentation:
+                    auto_instrumentation[key] = False
+        
+        super().__init__(user_detail=user_detail, auto_instrumentation=auto_instrumentation)
+
         self.project_name = project_name
         self.dataset_name = dataset_name
         self.tracer_type = tracer_type
@@ -76,6 +118,10 @@ class Tracer(AgenticTracing):
         self.num_projects = 100
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
 
+        if update_llm_cost:
+            # First update the model costs file from GitHub
+            update_model_costs_from_github()
+        
         try:
             response = requests.get(
                 f"{self.base_url}/v2/llm/projects?size={self.num_projects}",
