@@ -166,7 +166,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
     def add_component(self, component_data: dict, is_error: bool = False):
         """Add a component to the trace data"""
         # Convert dict to appropriate Component type
-        filtered_data = {k: v for k, v in component_data.items() if k in ["id", "hash_id", "type", "name", "start_time", "end_time", "parent_id", "info", "data", "network_calls", "interactions", "error"]}
+        filtered_data = {k: v for k, v in component_data.items() if k in ["id", "hash_id", "source_hash_id", "type", "name", "start_time", "end_time", "parent_id", "info", "data", "network_calls", "interactions", "error"]}
 
         if component_data["type"] == "llm":
             component = LLMComponent(**filtered_data)
@@ -206,6 +206,8 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
             parent_component = agent_tracer_mixin.create_agent_component(
                 component_id=parent_id,
                 hash_id=str(uuid.uuid4()),
+                source_hash_id=None,
+                type="agent",
                 name=self.current_agent_name.get(),
                 agent_type=self.agent_type.get(),
                 version=self.version.get(),
@@ -219,7 +221,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
                 parent_id=None  # Add parent ID if exists
             )
 
-            filtered_data = {k: v for k, v in parent_component.items() if k in ["id", "hash_id", "type", "name", "start_time", "end_time", "parent_id", "info", "data", "network_calls", "interactions", "error"]}
+            filtered_data = {k: v for k, v in parent_component.items() if k in ["id", "hash_id", "source_hash_id", "type", "name", "start_time", "end_time", "parent_id", "info", "data", "network_calls", "interactions", "error"]}
             parent_agent_component = AgentComponent(**filtered_data)
             # Add the parent component to trace and stop tracing
             super().add_component(parent_agent_component)

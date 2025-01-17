@@ -29,9 +29,14 @@ def extract_model_name(args, kwargs, result):
 
     # Handle vertex ai case
     if not model:
-        model = kwargs.get("run_manager", '')
-        if model:
-            model = model.get('ls_model_name', '')
+        manager = kwargs.get("run_manager", None)
+        if manager:
+            if hasattr(manager, 'metadata'):
+                metadata = manager.metadata
+                model_name = metadata.get('ls_model_name', None)
+                if model_name:
+                    model = model_name         
+    
     
     # Normalize Google model names
     if model and isinstance(model, str):
@@ -103,6 +108,30 @@ def extract_token_usage(result):
             "completion_tokens": getattr(metadata, "candidates_token_count", 0),
             "total_tokens": getattr(metadata, "total_token_count", 0)
         }
+    
+    # Handle ChatResult format with generations
+    if hasattr(result, "generations") and result.generations:
+        # Get the first generation
+        generation = result.generations[0]
+        
+        # Try to get usage from generation_info
+        if hasattr(generation, "generation_info"):
+            metadata = generation.generation_info.get("usage_metadata", {})
+            if metadata:
+                return {
+                    "prompt_tokens": metadata.get("prompt_token_count", 0),
+                    "completion_tokens": metadata.get("candidates_token_count", 0),
+                    "total_tokens": metadata.get("total_token_count", 0)
+                }
+        
+        # Try to get usage from message's usage_metadata
+        if hasattr(generation, "message") and hasattr(generation.message, "usage_metadata"):
+            metadata = generation.message.usage_metadata
+            return {
+                "prompt_tokens": metadata.get("input_tokens", 0),
+                "completion_tokens": metadata.get("output_tokens", 0),
+                "total_tokens": metadata.get("total_tokens", 0)
+            }
     
     # Handle Vertex AI format
     if hasattr(result, "text"):
