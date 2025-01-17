@@ -278,7 +278,7 @@ class LLMTracerMixin:
             "type": "llm",
             "name": name,
             "start_time": start_time.isoformat(),
-            "end_time": datetime.now().astimezone(),
+            "end_time": datetime.now().astimezone().isoformat(),
             "error": error,
             "parent_id": self.current_agent_id.get(),
             "info": {

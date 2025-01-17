@@ -399,7 +399,7 @@ class AgentTracerMixin:
             "type": "agent",
             "name": kwargs["name"],
             "start_time": start_time.isoformat(),
-            "end_time": datetime.now().isoformat(),
+            "end_time": datetime.now().astimezone().isoformat(),
             "error": kwargs.get("error"),
             "parent_id": kwargs.get("parent_id"),
             "info": {
