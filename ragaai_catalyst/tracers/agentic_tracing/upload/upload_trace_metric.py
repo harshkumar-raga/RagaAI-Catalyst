@@ -67,9 +67,9 @@ def _create_dataset_schema_with_trace(project_name, dataset_name):
 def _get_children_metrics_of_agent(children_traces):
     metrics = []
     for span in children_traces:
-        metrics.extend(span["metrics"])
+        metrics.extend(span.get("metrics", []))
         if span["type"] != "agent":
-            metric = span["metrics"]
+            metric = span.get("metrics", [])
             if metric:
                 metrics.extend(metric)
         else:
@@ -84,7 +84,7 @@ def get_trace_metrics_from_trace(traces):
             if children_metric:
                 metrics.extend(children_metric)
         else:
-            metric = span["metrics"]
+            metric = span.get("metrics", [])
             if metric:
                 metrics.extend(metric)
     return metrics
