@@ -185,9 +185,25 @@ class LLMTracerMixin:
         @functools.wraps(original_init)
         def patched_init(client_self, *args, **kwargs):
             original_init(client_self, *args, **kwargs)
-            self.wrap_method(client_self.chat.completions, "create")
-            if hasattr(client_self.chat.completions, "acreate"):
-                self.wrap_method(client_self.chat.completions, "acreate")
+            # Check if this is AsyncOpenAI or OpenAI
+            is_async = 'AsyncOpenAI' in client_class.__name__
+            
+            if is_async:
+                # Patch async methods for AsyncOpenAI
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+                    @functools.wraps(original_create)
+                    async def wrapped_create(*args, **kwargs):
+                        return await self.trace_llm_call(original_create, *args, **kwargs)
+                    client_self.chat.completions.create = wrapped_create
+            else:
+                # Patch sync methods for OpenAI
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+                    @functools.wraps(original_create)
+                    def wrapped_create(*args, **kwargs):
+                        return self.trace_llm_call_sync(original_create, *args, **kwargs)
+                    client_self.chat.completions.create = wrapped_create
 
         setattr(client_class, "__init__", patched_init)
 
@@ -495,12 +511,12 @@ class LLMTracerMixin:
             raise
 
     def trace_llm(self, name: str = None):
-        self.current_llm_call_name.set(name)
         def decorator(func):
             @self.file_tracker.trace_decorator
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return await func(*args, **kwargs)
                 
@@ -550,6 +566,7 @@ class LLMTracerMixin:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return func(*args, **kwargs)
                 
