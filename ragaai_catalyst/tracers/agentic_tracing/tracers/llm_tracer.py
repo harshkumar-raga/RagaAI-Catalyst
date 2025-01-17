@@ -511,12 +511,12 @@ class LLMTracerMixin:
             raise
 
     def trace_llm(self, name: str = None):
-        self.current_llm_call_name.set(name)
         def decorator(func):
             @self.file_tracker.trace_decorator
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return await func(*args, **kwargs)
                 
@@ -566,6 +566,7 @@ class LLMTracerMixin:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return func(*args, **kwargs)
                 
