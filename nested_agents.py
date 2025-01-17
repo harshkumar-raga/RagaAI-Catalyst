@@ -6,18 +6,33 @@ from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst
 import os
 import requests
-from dotenv import load_dotenv
-load_dotenv()
+import dotenv
+
+dotenv.load_dotenv()
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+# catalyst = RagaAICatalyst(
+#     access_key="pBxij88919zIMggB4T2J",
+#     secret_key="JcTfpL9ARpLH2RdSZqov8K1KyYonADKPbbi02k2k",
+#     base_url="https://catalyst.raga.ai/api"
+# )
+# catalyst = RagaAICatalyst(
+#     access_key="GOJqDkYz9WHOsJrdnOZq",
+#     secret_key="UkZdlUU733CXoCFXjVrRKisp3OlDjvgevxLU3pWc",
+#     base_url="https://llm-dev5.ragaai.ai/api"
+# )
 
 catalyst = RagaAICatalyst(
-    access_key="access_key",
-    secret_key="secret_key",
-    base_url="base_url"
+    access_key="saLy6KmMVlfAzunuQGS9",
+    secret_key="lm39fd4KXffM6gzLjnY9G7QReffhH4RGZPursp3A",
+    base_url="http://52.172.168.127/api"
 )
+
 # Initialize tracer
+project_name = "alteryx_copilot-sid"
+
 tracer = Tracer(
-    project_name="project_name",
-    dataset_name="dataset_name",
+    project_name=project_name,
+    dataset_name="metric_api_tagging_v3",
     tracer_type="tracer_type",
     metadata={
         "model": "gpt-4o-mini",
@@ -51,7 +66,7 @@ class SummaryAgent:
     def __init__(self, persona="Summary Agent"):
         self.persona = persona
 
-    @tracer.trace_agent(name="summary_agent", tags=['basic_agent'], metrics=[{'name': 'accuracy', 'reason': 'There is some reason for it'}])
+    @tracer.trace_agent(name="summary_agent", tags=['basic_agent'], metrics=[{'name': 'accuracy_1', 'reason': 'There is some reason for it', 'score': 0.5}])
     def summarize(self, text):
         # Make an LLM call
         prompt = f"Please summarize this text concisely: {text}"
@@ -63,7 +78,7 @@ class AnalysisAgent:
         self.persona = persona
         self.summary_agent = SummaryAgent()
 
-    @tracer.trace_agent(name="analysis_agent", tags=['coordinator_agent'], metrics=[{'name': 'correctness', 'score': 0.5}, {'name': 'accuracy', 'score': 0.8}])
+    @tracer.trace_agent(name="analysis_agent", tags=['coordinator_agent'], metrics=[{'name': 'correctness_1', 'score': 0.5}, {'name': 'accuracy_2', 'score': 0.8}])
     def analyze(self, text):
         # First use the summary agent
         summary = self.summary_agent.summarize(text)
@@ -121,7 +136,7 @@ def main():
     # result = recommendation_agent.recommend(text)
     result = get_recommendation(recommendation_agent, text)
     tracer.span('llm_call').add_metadata({'is_completed': True})
-    tracer.span('recommendation_agent').add_metrics(name='hallucination', score=0.5, reasoning='some reasoning')
+    tracer.span('recommendation_agent').add_metrics(name='hallucination_1', score=0.5, reasoning='some reasoning')
     
     print("\nResults:")
     print("Summary:", result["summary"])
