@@ -41,6 +41,7 @@ class LLMTracerMixin:
                     "output_cost_per_token": 0.0
                 }
             }
+        self.MAX_PARAMETERS_TO_DISPLAY = 10
         self.current_llm_call_name = contextvars.ContextVar("llm_call_name", default=None)
         self.component_network_calls = {}  
         self.component_user_interaction = {}
@@ -254,6 +255,22 @@ class LLMTracerMixin:
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
 
+        parameters_to_display = {}
+        if 'run_manager' in parameters:
+            parameters_obj = parameters['run_manager']
+            if hasattr(parameters_obj, 'metadata'):
+                metadata = parameters_obj.metadata
+                # parameters = {'metadata': metadata}
+                parameters_to_display.update(metadata)
+
+        # Add only those keys in parameters that are single values and not objects, dict or list
+        for key, value in parameters.items():
+            if isinstance(value, (str, int, float, bool)):
+                parameters_to_display[key] = value
+        
+        # Limit the number of parameters to display
+        parameters_to_display = dict(list(parameters_to_display.items())[:self.MAX_PARAMETERS_TO_DISPLAY])
+
         component = {
             "id": component_id,
             "hash_id": hash_id,
@@ -270,8 +287,9 @@ class LLMTracerMixin:
                 "memory_used": memory_used,
                 "cost": cost,
                 "tokens": usage,
-                **parameters
+                **parameters_to_display
             },
+            "extra_info": parameters,
             "data": {
                 "input": input_data['args'] if hasattr(input_data, 'args') else input_data,
                 "output": output_data.output_response if output_data else None,
