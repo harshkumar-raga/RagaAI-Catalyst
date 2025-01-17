@@ -221,16 +221,16 @@ class Component:
         }
 
 class LLMComponent(Component):
-    def __init__(self, id: str, hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
-        super().__init__(id, hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+        super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
 
 class AgentComponent(Component):
-    def __init__(self, id: str, hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
-        super().__init__(id, hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+        super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
 
 class ToolComponent(Component):
-    def __init__(self, id: str, hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
-        super().__init__(id, hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
+    def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], data: Dict[str, Any], network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
+        super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, data, network_calls, interactions, error)
 
 @dataclass
 class ComponentInfo:

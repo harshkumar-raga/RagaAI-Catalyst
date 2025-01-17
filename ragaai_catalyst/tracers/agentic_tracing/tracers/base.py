@@ -1,3 +1,4 @@
+import imp
 import json
 import os
 import platform
@@ -633,7 +634,7 @@ class BaseTracer:
             if span.interactions:
                 for span_interaction in span.interactions:
                     interaction = {}
-                    interaction["id"] = str(span_interaction.id)
+                    interaction["id"] = str(interaction_id)
                     interaction["span_id"] = span.id
                     interaction["interaction_type"] = span_interaction.type
                     interaction["content"] = span_interaction.content
@@ -644,8 +645,9 @@ class BaseTracer:
                     
             if span.network_calls:
                 for span_network_call in span.network_calls:
+                    import pdb; pdb.set_trace()
                     network_call = {}
-                    network_call["id"] = str(span_interaction.id)
+                    network_call["id"] = str(interaction_id)
                     network_call['span_id'] = span.id
                     network_call["interaction_type"] = "network_call"
                     network_call["name"] = None
@@ -661,7 +663,7 @@ class BaseTracer:
                             "body": span_network_call.get("response_body"),
                         }
                     }
-                    network_call["timestamp"] = span_network_call['start_time']
+                    network_call["timestamp"] = span_network_call.get('timestamp')
                     network_call["error"] = span_network_call.get('error')
                     interactions.append(network_call)
                     interaction_id += 1
