@@ -61,7 +61,6 @@ class AgentTracerMixin:
                         version=version,
                         capabilities=capabilities or [],
                         start_time=datetime.now(),
-                        end_time=datetime.now(),
                         memory_used=0,
                         input_data=tracer._sanitize_input(args, kwargs),
                         output_data=None,
@@ -110,7 +109,6 @@ class AgentTracerMixin:
                                     try:
                                         start_time = datetime.now()
                                         result = method(self, *args, **kwargs)
-                                        end_time = datetime.now()
                                         
                                         # Update agent component with method result
                                         if hasattr(tracer, '_agent_components'):
@@ -119,7 +117,6 @@ class AgentTracerMixin:
                                                 component['data']['output'] = tracer._sanitize_output(result)
                                                 component['data']['input'] = tracer._sanitize_input(args, kwargs)
                                                 component['start_time'] = start_time.isoformat()
-                                                component['end_time'] = end_time.isoformat()
                                                 
                                                 # Get children accumulated during method execution
                                                 children = tracer.agent_children.get()
@@ -192,7 +189,6 @@ class AgentTracerMixin:
             result = func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -211,7 +207,6 @@ class AgentTracerMixin:
                 version=version,
                 capabilities=capabilities or [],
                 start_time=start_time,
-                end_time=end_time,
                 memory_used=memory_used,
                 input_data=self.input_data,
                 output_data=self._sanitize_output(result),
@@ -257,7 +252,6 @@ class AgentTracerMixin:
                 version=version,
                 capabilities=capabilities or [],
                 start_time=start_time,
-                end_time=datetime.now(),
                 memory_used=0,
                 input_data=self.input_data,
                 output_data=None,
@@ -309,7 +303,6 @@ class AgentTracerMixin:
             result = await func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -325,7 +318,6 @@ class AgentTracerMixin:
                 version=version,
                 capabilities=capabilities or [],
                 start_time=start_time,
-                end_time=end_time,
                 memory_used=memory_used,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=self._sanitize_output(result),
@@ -372,7 +364,6 @@ class AgentTracerMixin:
                 version=version,
                 capabilities=capabilities or [],
                 start_time=start_time,
-                end_time=datetime.now(),
                 memory_used=0,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
@@ -408,7 +399,7 @@ class AgentTracerMixin:
             "type": "agent",
             "name": kwargs["name"],
             "start_time": start_time.isoformat(),
-            "end_time": kwargs["end_time"].isoformat(),
+            "end_time": datetime.now().isoformat(),
             "error": kwargs.get("error"),
             "parent_id": kwargs.get("parent_id"),
             "info": {
