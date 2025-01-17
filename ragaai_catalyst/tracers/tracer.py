@@ -288,20 +288,22 @@ class Tracer(AgenticTracing):
         # Note: We're not resetting all attributes here to allow for upload status checking
 
     def _pass_user_data(self):
-        return {"project_name":self.project_name, 
+        user_detail = {
+            "project_name":self.project_name, 
+            "project_id": self.project_id,
+            "dataset_name":self.dataset_name, 
+            "trace_user_detail" : {
                 "project_id": self.project_id,
-                "dataset_name":self.dataset_name, 
-                "trace_user_detail" : {
-                    "project_id": self.project_id,
-                    "trace_id": "",
-                    "session_id": None,
-                    "trace_type": self.tracer_type,
-                    "traces": [],
-                    "metadata": self.metadata,
-                    "pipeline": {
-                        "llm_model": self.pipeline["llm_model"],
-                        "vector_store": self.pipeline["vector_store"],
-                        "embed_model": self.pipeline["embed_model"]
-                        }
+                "trace_id": "",
+                "session_id": None,
+                "trace_type": self.tracer_type,
+                "traces": [],
+                "metadata": self.metadata,
+                "pipeline": {
+                    "llm_model": (getattr(self, "pipeline", {}) or {}).get("llm_model", ""),
+                    "vector_store": (getattr(self, "pipeline", {}) or {}).get("vector_store", ""),
+                    "embed_model": (getattr(self, "pipeline", {}) or {}).get("embed_model", "")
                     }
                 }
+            }
+        return user_detail
