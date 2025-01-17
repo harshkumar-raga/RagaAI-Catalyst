@@ -19,6 +19,7 @@ from ..data.data_structure import (
 
 from ..upload.upload_agentic_traces import UploadAgenticTraces
 from ..upload.upload_code import upload_code
+from ..upload.upload_trace_metric import upload_trace_metric
 from ..utils.file_name_tracker import TrackName
 from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
 from ..utils.span_attributes import SpanAttributes
@@ -207,13 +208,22 @@ class BaseTracer:
                 json.dump(cleaned_trace_data, f, cls=TracerJSONEncoder, indent=2)
                 
             print(f"Trace saved to {filepath}")
-            # Upload traces
+            
             json_file_path = str(filepath)
             project_name = self.project_name
             project_id = self.project_id 
             dataset_name = self.dataset_name
             user_detail = self.user_details
             base_url = os.getenv('RAGAAI_CATALYST_BASE_URL')
+
+            ##Upload trace metrics
+            response = upload_trace_metric(
+                json_file_path=json_file_path,
+                dataset_name=self.dataset_name,
+                project_name=self.project_name
+            )
+
+            # Upload traces
             upload_traces = UploadAgenticTraces(
                 json_file_path=json_file_path,
                 project_name=project_name,

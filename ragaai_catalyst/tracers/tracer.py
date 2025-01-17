@@ -72,7 +72,7 @@ class Tracer(AgenticTracing):
         self.description = description
         self.upload_timeout = upload_timeout
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
-        self.timeout = 10
+        self.timeout = 30
         self.num_projects = 100
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
 
