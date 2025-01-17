@@ -254,6 +254,12 @@ class LLMTracerMixin:
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
 
+        if 'run_manager' in parameters:
+            parameters = parameters['run_manager']
+            if hasattr(parameters, 'metadata'):
+                metadata = parameters.metadata
+                parameters = {'metadata': metadata}
+
         component = {
             "id": component_id,
             "hash_id": hash_id,
