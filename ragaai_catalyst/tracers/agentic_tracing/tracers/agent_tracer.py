@@ -18,7 +18,7 @@ class AgentTracerMixin:
         self.agent_children = contextvars.ContextVar("agent_children", default=[])
         self.component_network_calls = contextvars.ContextVar("component_network_calls", default={})
         self.component_user_interaction = contextvars.ContextVar("component_user_interaction", default={})
-        self.version = contextvars.ContextVar("version", default="1.0.0")
+        self.version = contextvars.ContextVar("version", default=None)
         self.agent_type = contextvars.ContextVar("agent_type", default="generic")
         self.capabilities = contextvars.ContextVar("capabilities", default=[])
         self.start_time = contextvars.ContextVar("start_time", default=None)

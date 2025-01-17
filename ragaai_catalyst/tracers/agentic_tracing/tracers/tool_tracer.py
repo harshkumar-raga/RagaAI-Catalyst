@@ -32,7 +32,7 @@ class ToolTracerMixin:
     def instrument_network_calls(self):
         self.auto_instrument_network = True
 
-    def trace_tool(self, name: str, tool_type: str = "generic", version: str = "1.0.0"):
+    def trace_tool(self, name: str, tool_type: str = "generic", version: str = None):
         def decorator(func):
             # Add metadata attribute to the function
             metadata = {
