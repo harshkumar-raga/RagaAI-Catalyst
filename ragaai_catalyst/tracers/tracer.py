@@ -191,6 +191,9 @@ class Tracer(AgenticTracing):
             print("Stopping tracer and initiating trace upload...")
             self._cleanup()
             self._upload_task = self._run_async(self._upload_traces())
+            self.is_active = False
+            self.dataset_name = None
+            
             return "Trace upload initiated. Use get_upload_status() to check the status."
         elif self.tracer_type == "llamaindex":
             from ragaai_catalyst.tracers.llamaindex_callback import LlamaIndexTracer
