@@ -22,13 +22,7 @@ def get_user_trace_metrics(project_name, dataset_name):
                 print(f"Error fetching traces metrics: {response.json()['message']}")
                 return None
             
-            return _trace_metric_names(response.json()["data"]["columns"])
+            return response.json()["data"]["columns"]
     except Exception as e:
         print(f"Error fetching traces metrics: {e}")
         return None
-
-def _trace_metric_names(trace_metrics):
-    metrics = []
-    for metric in trace_metrics:
-        metrics.append(metric["displayName"])
-    return metrics
