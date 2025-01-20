@@ -13,11 +13,14 @@ def upload_trace_metric(json_file_path, dataset_name, project_name):
         metrics = _change_metrics_format_for_payload(metrics)
 
         user_trace_metrics = get_user_trace_metrics(project_name, dataset_name)
+        user_trace_metrics_list = [metric["displayName"] for metric in user_trace_metrics]
         
-        if user_trace_metrics:
+        if user_trace_metrics_list:
             for metric in metrics:
-                if metric["displayName"] in user_trace_metrics:
-                    raise ValueError(f"Metrics {metric['displayName']} already exist in dataset {dataset_name} of project {project_name}.")
+                if metric["displayName"] in user_trace_metrics_list:
+                    metricConfig = next((user_metric["metricConfig"] for user_metric in user_trace_metrics if user_metric["displayName"] == metric["displayName"]), None)
+                    if not metricConfig or metricConfig.get("Metric Source", {}).get("value") != "user":
+                        raise ValueError(f"Metrics {metric['displayName']} already exist in dataset {dataset_name} of project {project_name}.")
 
         headers = {
             "Content-Type": "application/json",
