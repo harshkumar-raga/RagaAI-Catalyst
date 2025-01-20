@@ -118,7 +118,30 @@ class Tracer(AgenticTracing):
         else:
             self._upload_task = None
             # raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
+
         
+    def set_dataset_name(self, dataset_name):
+        """
+        Reinitialize the Tracer with a new dataset name while keeping all other parameters the same.
+        
+        Args:
+            dataset_name (str): The new dataset name to set
+        """
+        # Store current parameters
+        current_params = {
+            'project_name': self.project_name,
+            'tracer_type': self.tracer_type,
+            'pipeline': self.pipeline,
+            'metadata': self.metadata,
+            'description': self.description,
+            'upload_timeout': self.upload_timeout
+        }
+        
+        # Reinitialize self with new dataset_name and stored parameters
+        self.__init__(
+            dataset_name=dataset_name,
+            **current_params
+        )
 
     def _improve_metadata(self, metadata, tracer_type):
         if metadata is None:
