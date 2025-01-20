@@ -26,6 +26,17 @@ def extract_model_name(args, kwargs, result):
             # Try model attribute
             elif hasattr(instance, "model"):
                 model = instance.model
+
+    # Handle vertex ai case
+    if not model:
+        manager = kwargs.get("run_manager", None)
+        if manager:
+            if hasattr(manager, 'metadata'):
+                metadata = manager.metadata
+                model_name = metadata.get('ls_model_name', None)
+                if model_name:
+                    model = model_name         
+    
     
     # Normalize Google model names
     if model and isinstance(model, str):
@@ -97,6 +108,30 @@ def extract_token_usage(result):
             "completion_tokens": getattr(metadata, "candidates_token_count", 0),
             "total_tokens": getattr(metadata, "total_token_count", 0)
         }
+    
+    # Handle ChatResult format with generations
+    if hasattr(result, "generations") and result.generations:
+        # Get the first generation
+        generation = result.generations[0]
+        
+        # Try to get usage from generation_info
+        if hasattr(generation, "generation_info"):
+            metadata = generation.generation_info.get("usage_metadata", {})
+            if metadata:
+                return {
+                    "prompt_tokens": metadata.get("prompt_token_count", 0),
+                    "completion_tokens": metadata.get("candidates_token_count", 0),
+                    "total_tokens": metadata.get("total_token_count", 0)
+                }
+        
+        # Try to get usage from message's usage_metadata
+        if hasattr(generation, "message") and hasattr(generation.message, "usage_metadata"):
+            metadata = generation.message.usage_metadata
+            return {
+                "prompt_tokens": metadata.get("input_tokens", 0),
+                "completion_tokens": metadata.get("output_tokens", 0),
+                "total_tokens": metadata.get("total_tokens", 0)
+            }
     
     # Handle Vertex AI format
     if hasattr(result, "text"):
@@ -203,7 +238,7 @@ def extract_llm_output(result):
         else:
             # We're in an async context, but this function is called synchronously
             # Return a placeholder and let the caller handle the coroutine
-            return OutputResponse("Coroutine result pending")
+            return OutputResponse([{'content': "Coroutine result pending", "role": "assistant"}])
 
     # Handle Google GenerativeAI format
     if hasattr(result, "result"):
@@ -222,11 +257,23 @@ def extract_llm_output(result):
         return OutputResponse(output)
     
     # Handle Vertex AI format
+    # format1
     if hasattr(result, "text"):
         return OutputResponse([{
             "content": result.text,
             "role": "assistant"
         }])
+
+
+    # format2
+    if hasattr(result, "generations"):
+        output = []
+        for generation in result.generations:
+            output.append({
+                "content": generation.text,
+                "role": "assistant"
+            })
+        return OutputResponse(output)
     
     # Handle OpenAI format
     if hasattr(result, "choices"):
@@ -234,16 +281,17 @@ def extract_llm_output(result):
             "content": choice.message.content,
             "role": choice.message.role
         } for choice in result.choices])
-    
+
+
     # Handle Anthropic format
-    if hasattr(result, "completion"):
+    if hasattr(result, "content"):
         return OutputResponse([{
-            "content": result.completion,
+            "content": result.content[0].text,
             "role": "assistant"
         }])
     
     # Default case
-    return OutputResponse(str(result))
+    return OutputResponse([{'content': result, 'role': 'assistant'}])
 
 
 def extract_llm_data(args, kwargs, result):

@@ -31,11 +31,7 @@ class Experiment:
         Returns:
             None
         """
-        Experiment.BASE_URL = (
-            os.getenv("RAGAAI_CATALYST_BASE_URL")
-            if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.prod5.ragaai.ai/api"
-        )
+        Experiment.BASE_URL = RagaAICatalyst.BASE_URL
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.experiment_description = experiment_description

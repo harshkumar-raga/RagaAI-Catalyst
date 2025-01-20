@@ -1,4 +1,3 @@
-import imp
 import json
 import os
 import platform
@@ -10,7 +9,7 @@ from typing import List, Any
 import uuid
 import sys
 import tempfile
-
+from ....ragaai_catalyst import RagaAICatalyst
 from ..data.data_structure import (
     Trace, Metadata, SystemInfo, OSInfo, EnvironmentInfo,
     Resources, CPUResource, MemoryResource, DiskResource, NetworkResource,
@@ -227,16 +226,7 @@ class BaseTracer:
             project_id = self.project_id 
             dataset_name = self.dataset_name
             user_detail = self.user_details
-            base_url = os.getenv('RAGAAI_CATALYST_BASE_URL')
-
-            ##Upload trace metrics
-            response = upload_trace_metric(
-                json_file_path=json_file_path,
-                dataset_name=self.dataset_name,
-                project_name=self.project_name
-            )
-
-            # Upload traces
+            base_url = RagaAICatalyst.BASE_URL
             upload_traces = UploadAgenticTraces(
                 json_file_path=json_file_path,
                 project_name=project_name,
@@ -724,7 +714,6 @@ class BaseTracer:
                     
             if span.network_calls:
                 for span_network_call in span.network_calls:
-                    import pdb; pdb.set_trace()
                     network_call = {}
                     network_call["id"] = str(interaction_id)
                     network_call['span_id'] = span.id
