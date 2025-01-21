@@ -35,7 +35,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         
         self.project_name = user_detail["project_name"]
         self.project_id = user_detail["project_id"]
-        self.dataset_name = user_detail["dataset_name"]
+        # self.dataset_name = user_detail["dataset_name"]
         self.trace_user_detail = user_detail["trace_user_detail"]
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
