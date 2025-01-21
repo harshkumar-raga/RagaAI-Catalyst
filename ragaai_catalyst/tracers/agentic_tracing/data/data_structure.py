@@ -193,7 +193,6 @@ class Component:
         interactions: Optional[List[Union[Interaction, Dict]]] = None,
         error: Optional[Dict[str, Any]] = None):
 
-
         self.id = id
         self.hash_id = hash_id
         self.source_hash_id = source_hash_id
@@ -257,6 +256,7 @@ class AgentComponent(Component):
 class ToolComponent(Component):
     def __init__(self, id: str, hash_id: str, source_hash_id: str, type: str, name: str, start_time: str, end_time: str, parent_id: int, info: Dict[str, Any], extra_info: Optional[Dict[str, Any]] = None, data: Dict[str, Any]={}, metadata: Optional[Dict[str, Any]] = None, metrics: Optional[List[Dict[str, Any]]] = None, feedback: Optional[Any] = None, network_calls: Optional[List[NetworkCall]] = None, interactions: Optional[List[Union[Interaction, Dict]]] = None, error: Optional[Dict[str, Any]] = None):
         super().__init__(id, hash_id, source_hash_id, type, name, start_time, end_time, parent_id, info, extra_info, data, metadata, metrics, feedback, network_calls, interactions, error)
+
 
 @dataclass
 class ComponentInfo:
