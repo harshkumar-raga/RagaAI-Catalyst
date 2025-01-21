@@ -23,6 +23,7 @@ from ..upload.upload_trace_metric import upload_trace_metric
 from ..utils.file_name_tracker import TrackName
 from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
 from ..utils.span_attributes import SpanAttributes
+from ..utils.create_dataset_schema import create_dataset_schema_with_trace
 
 
 # Configure logging to show debug messages (which includes info messages as well)
@@ -227,6 +228,20 @@ class BaseTracer:
             dataset_name = self.dataset_name
             user_detail = self.user_details
             base_url = RagaAICatalyst.BASE_URL
+
+            ## create dataset schema
+            response = create_dataset_schema_with_trace(
+                dataset_name=dataset_name,
+                project_name=project_name
+            )
+
+            ##Upload trace metrics
+            response = upload_trace_metric(
+                json_file_path=json_file_path,
+                dataset_name=self.dataset_name,
+                project_name=self.project_name
+            )
+
             upload_traces = UploadAgenticTraces(
                 json_file_path=json_file_path,
                 project_name=project_name,
