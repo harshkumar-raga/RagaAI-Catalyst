@@ -45,6 +45,7 @@ class LLMTracerMixin:
                     "output_cost_per_token": 0.0
                 }
             }
+        self.MAX_PARAMETERS_TO_DISPLAY = 10
         self.current_llm_call_name = contextvars.ContextVar("llm_call_name", default=None)
         self.component_network_calls = {}  
         self.component_user_interaction = {}
@@ -204,9 +205,25 @@ class LLMTracerMixin:
         @functools.wraps(original_init)
         def patched_init(client_self, *args, **kwargs):
             original_init(client_self, *args, **kwargs)
-            self.wrap_method(client_self.chat.completions, "create")
-            if hasattr(client_self.chat.completions, "acreate"):
-                self.wrap_method(client_self.chat.completions, "acreate")
+            # Check if this is AsyncOpenAI or OpenAI
+            is_async = 'AsyncOpenAI' in client_class.__name__
+            
+            if is_async:
+                # Patch async methods for AsyncOpenAI
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+                    @functools.wraps(original_create)
+                    async def wrapped_create(*args, **kwargs):
+                        return await self.trace_llm_call(original_create, *args, **kwargs)
+                    client_self.chat.completions.create = wrapped_create
+            else:
+                # Patch sync methods for OpenAI
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+                    @functools.wraps(original_create)
+                    def wrapped_create(*args, **kwargs):
+                        return self.trace_llm_call_sync(original_create, *args, **kwargs)
+                    client_self.chat.completions.create = wrapped_create
 
         setattr(client_class, "__init__", patched_init)
 
@@ -269,11 +286,12 @@ class LLMTracerMixin:
             setattr(obj, method_name, wrapped_method)
             self.patches.append((obj, method_name, original_method))
 
-    def create_llm_component(self, component_id, hash_id, name, llm_type, version, memory_used, start_time, end_time, input_data, output_data, cost={}, usage={}, error=None, parameters={}):
+    def create_llm_component(self, component_id, hash_id, name, llm_type, version, memory_used, start_time, input_data, output_data, cost={}, usage={}, error=None, parameters={}):
         # Update total metrics
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
 
+# <<<<<<< HEAD
         network_calls = []
         if self.auto_instrument_network:
             network_calls = self.component_network_calls.get(component_id, [])
@@ -281,6 +299,23 @@ class LLMTracerMixin:
         interactions = []
         if self.auto_instrument_user_interaction:
             interactions = self.component_user_interaction.get(component_id, [])
+# =======
+        parameters_to_display = {}
+        if 'run_manager' in parameters:
+            parameters_obj = parameters['run_manager']
+            if hasattr(parameters_obj, 'metadata'):
+                metadata = parameters_obj.metadata
+                # parameters = {'metadata': metadata}
+                parameters_to_display.update(metadata)
+
+        # Add only those keys in parameters that are single values and not objects, dict or list
+        for key, value in parameters.items():
+            if isinstance(value, (str, int, float, bool)):
+                parameters_to_display[key] = value
+        
+        # Limit the number of parameters to display
+        parameters_to_display = dict(list(parameters_to_display.items())[:self.MAX_PARAMETERS_TO_DISPLAY])
+# >>>>>>> main
 
         component = {
             "id": component_id,
@@ -289,7 +324,7 @@ class LLMTracerMixin:
             "type": "llm",
             "name": name,
             "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
+            "end_time": datetime.now().astimezone().isoformat(),
             "error": error,
             "parent_id": self.current_agent_id.get(),
             "info": {
@@ -298,8 +333,9 @@ class LLMTracerMixin:
                 "memory_used": memory_used,
                 "cost": cost,
                 "tokens": usage,
-                **parameters
+                **parameters_to_display
             },
+            "extra_info": parameters,
             "data": {
                 "input": input_data['args'] if hasattr(input_data, 'args') else input_data,
                 "output": output_data.output_response if output_data else None,
@@ -345,7 +381,6 @@ class LLMTracerMixin:
             result = await original_func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -372,7 +407,6 @@ class LLMTracerMixin:
                 version=None,
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=input_data,
                 output_data=extract_llm_output(result),
                 cost=cost,
@@ -394,8 +428,6 @@ class LLMTracerMixin:
             
             # End tracking network calls for this component
             self.end_component(component_id)
-            
-            end_time = datetime.now().astimezone()
 
             name = self.current_llm_call_name.get()
             if name is None:
@@ -409,7 +441,6 @@ class LLMTracerMixin:
                 version=None,
                 memory_used=0,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=extract_input_data(args, kwargs, None),
                 output_data=None,
                 error=error_component
@@ -436,7 +467,6 @@ class LLMTracerMixin:
         self.start_component(component_id)
 
         # Calculate resource usage
-        end_time = datetime.now().astimezone()
         start_memory = psutil.Process().memory_info().rss
 
         try:
@@ -472,7 +502,6 @@ class LLMTracerMixin:
                 version=None,
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=input_data,
                 output_data=extract_llm_output(result),
                 cost=cost,
@@ -493,8 +522,6 @@ class LLMTracerMixin:
             
             # End tracking network calls for this component
             self.end_component(component_id)
-            
-            end_time = datetime.now().astimezone()
 
             name = self.current_llm_call_name.get()
             if name is None:
@@ -511,7 +538,6 @@ class LLMTracerMixin:
                 version=None,
                 memory_used=memory_used,
                 start_time=start_time,
-                end_time=end_time,
                 input_data=extract_input_data(args, kwargs, None),
                 output_data=None,
                 error=error_component
@@ -520,6 +546,7 @@ class LLMTracerMixin:
             self.add_component(llm_component, is_error=True)
             raise
 
+# <<<<<<< HEAD
     def trace_llm(self, name: str = None, tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
         if name not in self.span_attributes_dict:
             self.span_attributes_dict[name] = SpanAttributes(name)
@@ -547,11 +574,15 @@ class LLMTracerMixin:
             self.span(name).add_feedback(feedback)
 
         self.current_llm_call_name.set(name)
+# =======
+    # def trace_llm(self, name: str = None):
+# >>>>>>> main
         def decorator(func):
             @self.file_tracker.trace_decorator
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return await func(*args, **kwargs)
                 
@@ -601,6 +632,7 @@ class LLMTracerMixin:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 self.gt = kwargs.get('gt', None) if kwargs else None
+                self.current_llm_call_name.set(name)
                 if not self.is_active:
                     return func(*args, **kwargs)
                 

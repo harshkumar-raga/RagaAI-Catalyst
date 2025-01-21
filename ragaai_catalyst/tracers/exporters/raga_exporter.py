@@ -55,11 +55,7 @@ class RagaExporter:
         """
         self.project_name = project_name
         self.dataset_name = dataset_name
-        RagaExporter.BASE_URL = (
-            os.getenv("RAGAAI_CATALYST_BASE_URL")
-            if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://catalyst.raga.ai/api"
-        )
+        RagaExporter.BASE_URL = RagaAICatalyst.BASE_URL
         self.access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
         self.secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
         self.max_urls = 20
