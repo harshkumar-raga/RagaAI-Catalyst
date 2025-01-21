@@ -37,7 +37,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         
         self.project_name = user_detail["project_name"]
         self.project_id = user_detail["project_id"]
-        self.dataset_name = user_detail["dataset_name"]
+        # self.dataset_name = user_detail["dataset_name"]
         self.trace_user_detail = user_detail["trace_user_detail"]
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
@@ -231,6 +231,7 @@ class AgenticTracing(BaseTracer, LLMTracerMixin, ToolTracerMixin, AgentTracerMix
         """Add a component to the trace data"""
         # Convert dict to appropriate Component type
         filtered_data = {k: v for k, v in component_data.items() if k in ["id", "hash_id", "source_hash_id", "type", "name", "start_time", "end_time", "parent_id", "info", "extra_info", "data", "metadata", "metrics", "feedback", "network_calls", "interactions", "error"]}
+
 
         if component_data["type"] == "llm":
             component = LLMComponent(**filtered_data)

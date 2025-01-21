@@ -291,7 +291,6 @@ class LLMTracerMixin:
         self.total_tokens += usage.get("total_tokens", 0)
         self.total_cost += cost.get("total_cost", 0)
 
-# <<<<<<< HEAD
         network_calls = []
         if self.auto_instrument_network:
             network_calls = self.component_network_calls.get(component_id, [])
@@ -299,7 +298,7 @@ class LLMTracerMixin:
         interactions = []
         if self.auto_instrument_user_interaction:
             interactions = self.component_user_interaction.get(component_id, [])
-# =======
+
         parameters_to_display = {}
         if 'run_manager' in parameters:
             parameters_obj = parameters['run_manager']
@@ -315,7 +314,6 @@ class LLMTracerMixin:
         
         # Limit the number of parameters to display
         parameters_to_display = dict(list(parameters_to_display.items())[:self.MAX_PARAMETERS_TO_DISPLAY])
-# >>>>>>> main
 
         component = {
             "id": component_id,
@@ -546,7 +544,6 @@ class LLMTracerMixin:
             self.add_component(llm_component, is_error=True)
             raise
 
-# <<<<<<< HEAD
     def trace_llm(self, name: str = None, tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
         if name not in self.span_attributes_dict:
             self.span_attributes_dict[name] = SpanAttributes(name)
@@ -574,9 +571,7 @@ class LLMTracerMixin:
             self.span(name).add_feedback(feedback)
 
         self.current_llm_call_name.set(name)
-# =======
-    # def trace_llm(self, name: str = None):
-# >>>>>>> main
+
         def decorator(func):
             @self.file_tracker.trace_decorator
             @functools.wraps(func)
