@@ -337,6 +337,7 @@ class AgentTracerMixin:
         # Initialize empty children list for this agent
         parent_children = self.agent_children.get()
         children_token = self.agent_children.set([])
+        self.start_component(component_id)
 
         try:
             # Execute the agent
@@ -348,6 +349,8 @@ class AgentTracerMixin:
 
             # Get children components collected during execution
             children = self.agent_children.get()
+            
+            self.end_component(component_id)
 
             # Create agent component with children and parent if exists
             agent_component = self.create_agent_component(

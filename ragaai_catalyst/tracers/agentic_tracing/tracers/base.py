@@ -383,9 +383,22 @@ class BaseTracer:
                         str(span_dict.get('data', {}).get('output'))
                     )
                     
+                    # Check if we've seen this span before
                     if span_key not in seen_llm_spans:
                         seen_llm_spans[span_key] = True
                         unique_spans.append(span)
+                    else:
+                        # If we have interactions in the current span, replace the existing one
+                        current_interactions = span_dict.get('interactions', [])
+                        if current_interactions:
+                            # Find and replace the existing span with this one that has interactions
+                            for i, existing_span in enumerate(unique_spans):
+                                existing_dict = existing_span if isinstance(existing_span, dict) else existing_span.__dict__
+                                if (existing_dict.get('hash_id') == span_dict.get('hash_id') and
+                                    str(existing_dict.get('data', {}).get('input')) == str(span_dict.get('data', {}).get('input')) and
+                                    str(existing_dict.get('data', {}).get('output')) == str(span_dict.get('data', {}).get('output'))):
+                                    unique_spans[i] = span
+                                    break
                 else:
                     # For non-LLM spans, process their children if they exist
                     if 'data' in span_dict and 'children' in span_dict['data']:

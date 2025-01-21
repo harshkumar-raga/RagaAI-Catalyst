@@ -181,7 +181,8 @@ class ToolTracerMixin:
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
-
+        
+        self.start_component(component_id)
         try:
             # Execute the tool
             result = await func(*args, **kwargs)
@@ -189,6 +190,7 @@ class ToolTracerMixin:
             # Calculate resource usage
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
+            self.end_component(component_id)
 
             # Create tool component
             tool_component = self.create_tool_component(
