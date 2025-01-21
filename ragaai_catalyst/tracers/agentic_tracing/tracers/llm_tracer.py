@@ -622,6 +622,8 @@ class LLMTracerMixin:
                         self.add_component(llm_component)
                     
                     self.end_component(component_id)
+                    llm_component['interactions'] = self.component_user_interaction.get(component_id, [])
+                    self.add_component(llm_component)
 
             @self.file_tracker.trace_decorator
             @functools.wraps(func)
@@ -655,7 +657,7 @@ class LLMTracerMixin:
                     }
                     raise
                 finally:
-
+                    
                     llm_component = self.llm_data
                     if (name is not None) or (name != ""):
                         llm_component['name'] = name 
@@ -671,6 +673,8 @@ class LLMTracerMixin:
                         self.add_component(llm_component)
                     
                     self.end_component(component_id)
+                    llm_component['interactions'] = self.component_user_interaction.get(component_id, [])
+                    self.add_component(llm_component)
 
             return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
         return decorator
