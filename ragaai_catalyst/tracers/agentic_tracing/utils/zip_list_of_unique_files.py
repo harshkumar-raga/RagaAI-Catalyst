@@ -374,17 +374,17 @@ class TraceDependencyTracker:
         hash_contents = []
 
         for filepath in sorted(self.tracked_files):
-            if 'env' in filepath:
+            if not filepath.endswith('.py'):
+                continue
+            elif '/envs' in filepath or '__init__' in filepath:
                 continue
             try:
                 with open(filepath, 'rb') as file:
                     content = file.read()
-                    if filepath.endswith('.py'):
-                        content = remove_package_code(content.decode('utf-8'), 'ragaai_catalyst').encode('utf-8')
-                        content = comment_magic_commands(content)
+                    content = remove_package_code(content.decode('utf-8'), 'ragaai_catalyst').encode('utf-8')
                     hash_contents.append(content)
             except Exception as e:
-                # logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
+                logger.warning(f"Could not read {filepath} for hash calculation: {str(e)}")
                 pass
 
 
