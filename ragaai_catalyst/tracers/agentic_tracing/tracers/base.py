@@ -774,10 +774,23 @@ class BaseTracer:
                     {
                         "id": str(interaction_id),
                         "span_id": span.id,
-                        "interaction_type": span.type,
+                        "interaction_type": f"{span.type}_call_start",
                         "name": span.name,
                         "content": span.data,
                         "timestamp": span.start_time,
+                        "error": span.error,
+                    }
+                )
+                interaction_id += 1
+
+                interactions.append(
+                    {
+                        "id": str(interaction_id),
+                        "span_id": span.id,
+                        "interaction_type": f"{span.type}_call_end",
+                        "name": span.name,
+                        "content": span.data,
+                        "timestamp": span.end_time,
                         "error": span.error,
                     }
                 )

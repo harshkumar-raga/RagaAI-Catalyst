@@ -587,6 +587,7 @@ class LLMTracerMixin:
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
+            self.add_component(llm_component, is_error=True)
             llm_component = self.create_llm_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -600,7 +601,6 @@ class LLMTracerMixin:
                 error=error_component,
             )
             self.llm_data = llm_component
-            self.add_component(llm_component, is_error=True)
 
             raise
 
@@ -681,6 +681,11 @@ class LLMTracerMixin:
                     if error_info:
                         llm_component["error"] = error_info["error"]
 
+                    self.end_component(component_id)
+                    llm_component["interactions"] = self.component_user_interaction.get(
+                        component_id, []
+                    )
+
                     if parent_agent_id:
                         children = self.agent_children.get()
                         children.append(llm_component)
@@ -688,10 +693,6 @@ class LLMTracerMixin:
                     else:
                         self.add_component(llm_component)
 
-                    self.end_component(component_id)
-                    llm_component["interactions"] = self.component_user_interaction.get(
-                        component_id, []
-                    )
                     self.add_component(llm_component)
 
             @self.file_tracker.trace_decorator
@@ -733,6 +734,11 @@ class LLMTracerMixin:
 
                     if error_info:
                         llm_component["error"] = error_info["error"]
+                        
+                    self.end_component(component_id)
+                    llm_component["interactions"] = self.component_user_interaction.get(
+                        component_id, []
+                    )
 
                     if parent_agent_id:
                         children = self.agent_children.get()
@@ -741,10 +747,6 @@ class LLMTracerMixin:
                     else:
                         self.add_component(llm_component)
 
-                    self.end_component(component_id)
-                    llm_component["interactions"] = self.component_user_interaction.get(
-                        component_id, []
-                    )
                     self.add_component(llm_component)
 
             return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
