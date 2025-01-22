@@ -10,8 +10,13 @@ import asyncio
 from ..utils.file_name_tracker import TrackName
 from ..utils.span_attributes import SpanAttributes
 import logging
+
 logger = logging.getLogger(__name__)
-logging_level = logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") else logger.setLevel(logging.INFO)
+logging_level = (
+    logger.setLevel(logging.DEBUG)
+    if os.getenv("DEBUG")
+    else logger.setLevel(logging.INFO)
+)
 
 
 class ToolTracerMixin:
@@ -28,16 +33,27 @@ class ToolTracerMixin:
         self.auto_instrument_tool = False
         self.auto_instrument_user_interaction = False
         self.auto_instrument_network = False
+
     # take care of auto_instrument
     def instrument_tool_calls(self):
         self.auto_instrument_tool = True
+
     def instrument_user_interaction_calls(self):
         self.auto_instrument_user_interaction = True
+
     def instrument_network_calls(self):
         self.auto_instrument_network = True
 
-
-    def trace_tool(self, name: str, tool_type: str = "generic", version: str = "1.0.0", tags: List[str] = [], metadata: Dict[str, Any] = {}, metrics: List[Dict[str, Any]] = [], feedback: Optional[Any] = None):
+    def trace_tool(
+        self,
+        name: str,
+        tool_type: str = "generic",
+        version: str = "1.0.0",
+        tags: List[str] = [],
+        metadata: Dict[str, Any] = {},
+        metrics: List[Dict[str, Any]] = [],
+        feedback: Optional[Any] = None,
+    ):
         if name not in self.span_attributes_dict:
             self.span_attributes_dict[name] = SpanAttributes(name)
         if tags:
@@ -50,13 +66,13 @@ class ToolTracerMixin:
             for metric in metrics:
                 try:
                     self.span(name).add_metrics(
-                        name = metric['name'], 
-                        score = metric['score'], 
-                        reasoning = metric.get('reasoning', ''), 
-                        cost = metric.get('cost', None), 
-                        latency = metric.get('latency', None), 
-                        metadata = metric.get('metadata', {}), 
-                        config = metric.get('config', {})
+                        name=metric["name"],
+                        score=metric["score"],
+                        reasoning=metric.get("reasoning", ""),
+                        cost=metric.get("cost", None),
+                        latency=metric.get("latency", None),
+                        metadata=metric.get("metadata", {}),
+                        config=metric.get("config", {}),
                     )
                 except KeyError as e:
                     logger.error(f"Error adding metric: {e}")
@@ -69,9 +85,9 @@ class ToolTracerMixin:
                 "name": name,
                 "tool_type": tool_type,
                 "version": version,
-                "is_active": self.is_active
+                "is_active": self.is_active,
             }
-            
+
             # Check if the function is async
             is_async = asyncio.iscoroutinefunction(func)
 
@@ -79,7 +95,7 @@ class ToolTracerMixin:
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 async_wrapper.metadata = metadata
-                self.gt = kwargs.get('gt', None) if kwargs else None
+                self.gt = kwargs.get("gt", None) if kwargs else None
                 return await self._trace_tool_execution(
                     func, name, tool_type, version, *args, **kwargs
                 )
@@ -88,7 +104,7 @@ class ToolTracerMixin:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 sync_wrapper.metadata = metadata
-                self.gt = kwargs.get('gt', None) if kwargs else None
+                self.gt = kwargs.get("gt", None) if kwargs else None
                 return self._trace_sync_tool_execution(
                     func, name, tool_type, version, *args, **kwargs
                 )
@@ -99,11 +115,13 @@ class ToolTracerMixin:
 
         return decorator
 
-    def _trace_sync_tool_execution(self, func, name, tool_type, version, *args, **kwargs):
+    def _trace_sync_tool_execution(
+        self, func, name, tool_type, version, *args, **kwargs
+    ):
         """Synchronous version of tool tracing"""
         if not self.is_active:
             return func(*args, **kwargs)
-        
+
         if not self.auto_instrument_tool:
             return func(*args, **kwargs)
 
@@ -136,10 +154,11 @@ class ToolTracerMixin:
                 memory_used=memory_used,
                 start_time=start_time,
                 input_data=self._sanitize_input(args, kwargs),
-                output_data=self._sanitize_output(result)
+                output_data=self._sanitize_output(result),
             )
 
             self.add_component(tool_component)
+
             return result
 
         except Exception as e:
@@ -147,12 +166,12 @@ class ToolTracerMixin:
                 "code": 500,
                 "type": type(e).__name__,
                 "message": str(e),
-                "details": {}
+                "details": {},
             }
-            
+
             # End tracking network calls for this component
             self.end_component(component_id)
-            
+
             tool_component = self.create_tool_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -163,13 +182,16 @@ class ToolTracerMixin:
                 start_time=start_time,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
-                error=error_component
+                error=error_component,
             )
 
             self.add_component(tool_component)
+
             raise
 
-    async def _trace_tool_execution(self, func, name, tool_type, version, *args, **kwargs):
+    async def _trace_tool_execution(
+        self, func, name, tool_type, version, *args, **kwargs
+    ):
         """Asynchronous version of tool tracing"""
         if not self.is_active:
             return await func(*args, **kwargs)
@@ -181,7 +203,7 @@ class ToolTracerMixin:
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
-        
+
         self.start_component(component_id)
         try:
             # Execute the tool
@@ -202,9 +224,10 @@ class ToolTracerMixin:
                 start_time=start_time,
                 memory_used=memory_used,
                 input_data=self._sanitize_input(args, kwargs),
-                output_data=self._sanitize_output(result)
+                output_data=self._sanitize_output(result),
             )
             self.add_component(tool_component)
+
             return result
 
         except Exception as e:
@@ -212,9 +235,9 @@ class ToolTracerMixin:
                 "code": 500,
                 "type": type(e).__name__,
                 "message": str(e),
-                "details": {}
+                "details": {},
             }
-            
+
             tool_component = self.create_tool_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -225,9 +248,10 @@ class ToolTracerMixin:
                 memory_used=0,
                 input_data=self._sanitize_input(args, kwargs),
                 output_data=None,
-                error=error_component
+                error=error_component,
             )
             self.add_component(tool_component)
+
             raise
 
     def create_tool_component(self, **kwargs):
@@ -237,7 +261,9 @@ class ToolTracerMixin:
             network_calls = self.component_network_calls.get(kwargs["component_id"], [])
         interactions = []
         if self.auto_instrument_user_interaction:
-            interactions = self.component_user_interaction.get(kwargs["component_id"], [])
+            interactions = self.component_user_interaction.get(
+                kwargs["component_id"], []
+            )
 
         start_time = kwargs["start_time"]
         component = {
@@ -253,19 +279,24 @@ class ToolTracerMixin:
             "info": {
                 "tool_type": kwargs["tool_type"],
                 "version": kwargs["version"],
-                "memory_used": kwargs["memory_used"]
+                "memory_used": kwargs["memory_used"],
+                "tags": self.span_attributes_dict[kwargs["name"]].tags or [],
             },
             "data": {
                 "input": kwargs["input_data"],
                 "output": kwargs["output_data"],
-                "memory_used": kwargs["memory_used"]
+                "memory_used": kwargs["memory_used"],
             },
+            "metrics": self.span_attributes_dict[kwargs["name"]].metrics or [],
             "network_calls": network_calls,
-            "interactions": interactions
+            "interactions": interactions,
         }
 
-        if self.gt: 
+        if self.gt:
             component["data"]["gt"] = self.gt
+
+        # Reset the SpanAttributes context variable
+        self.span_attributes_dict[kwargs["name"]] = SpanAttributes(kwargs["name"])
 
         return component
 
@@ -278,11 +309,22 @@ class ToolTracerMixin:
     def _sanitize_input(self, args: tuple, kwargs: dict) -> Dict:
         """Sanitize and format input data"""
         return {
-            "args": [str(arg) if not isinstance(arg, (int, float, bool, str, list, dict)) else arg for arg in args],
+            "args": [
+                (
+                    str(arg)
+                    if not isinstance(arg, (int, float, bool, str, list, dict))
+                    else arg
+                )
+                for arg in args
+            ],
             "kwargs": {
-                k: str(v) if not isinstance(v, (int, float, bool, str, list, dict)) else v 
+                k: (
+                    str(v)
+                    if not isinstance(v, (int, float, bool, str, list, dict))
+                    else v
+                )
                 for k, v in kwargs.items()
-            }
+            },
         }
 
     def _sanitize_output(self, output: Any) -> Any:
