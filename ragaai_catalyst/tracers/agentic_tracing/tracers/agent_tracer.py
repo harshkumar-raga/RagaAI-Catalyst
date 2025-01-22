@@ -514,6 +514,19 @@ class AgentTracerMixin:
                 kwargs["component_id"], []
             )
         start_time = kwargs["start_time"]
+
+        # Get tags, metrics
+        name = kwargs["name"]
+        # tags
+        tags = []
+        if name in self.span_attributes_dict:
+            tags = self.span_attributes_dict[name].tags or []
+
+        # metrics
+        metrics = []
+        if name in self.span_attributes_dict:
+            metrics = self.span_attributes_dict[name].metrics or []
+
         component = {
             "id": kwargs["component_id"],
             "hash_id": kwargs["hash_id"],
@@ -529,14 +542,14 @@ class AgentTracerMixin:
                 "version": kwargs["version"],
                 "capabilities": kwargs["capabilities"],
                 "memory_used": kwargs["memory_used"],
-                "tags": self.span_attributes_dict[kwargs["name"]].tags or [],
+                "tags": tags,
             },
             "data": {
                 "input": kwargs["input_data"],
                 "output": kwargs["output_data"],
                 "children": kwargs.get("children", []),
             },
-            "metrics": self.span_attributes_dict[kwargs["name"]].metrics or [],
+            "metrics": metrics,
             "network_calls": network_calls,
             "interactions": interactions,
         }

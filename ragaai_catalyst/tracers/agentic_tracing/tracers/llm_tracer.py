@@ -354,6 +354,17 @@ class LLMTracerMixin:
             list(parameters_to_display.items())[: self.MAX_PARAMETERS_TO_DISPLAY]
         )
 
+        # Get tags, metrics
+        # tags
+        tags = []
+        if name in self.span_attributes_dict:
+            tags = self.span_attributes_dict[name].tags or []
+
+        # metrics
+        metrics = []
+        if name in self.span_attributes_dict:
+            metrics = self.span_attributes_dict[name].metrics or []
+
         component = {
             "id": component_id,
             "hash_id": hash_id,
@@ -370,7 +381,7 @@ class LLMTracerMixin:
                 "memory_used": memory_used,
                 "cost": cost,
                 "tokens": usage,
-                "tags": self.span_attributes_dict[name].tags or [],
+                "tags": tags,
                 **parameters_to_display,
             },
             "extra_info": parameters,
@@ -381,7 +392,7 @@ class LLMTracerMixin:
                 "output": output_data.output_response if output_data else None,
                 "memory_used": memory_used,
             },
-            "metrics": self.span_attributes_dict[name].metrics or [],
+            "metrics": metrics,
             "network_calls": network_calls,
             "interactions": interactions,
         }
