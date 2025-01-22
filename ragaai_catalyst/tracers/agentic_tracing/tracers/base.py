@@ -530,7 +530,7 @@ class BaseTracer:
                     {
                         "id": str(interaction_id),
                         "span_id": span.id,
-                        "interaction_type": "agent_start",
+                        "interaction_type": "agent_call_start",
                         "name": span.name,
                         "content": None,
                         "timestamp": span.start_time,
@@ -603,7 +603,7 @@ class BaseTracer:
                                 {
                                     "id": str(interaction_id),
                                     "span_id": child.get("id"),
-                                    "interaction_type": "llm_call_stop",
+                                    "interaction_type": "llm_call_end",
                                     "name": child.get("name"),
                                     "content": {
                                         "response": child.get("data", {}).get("output")
@@ -698,7 +698,7 @@ class BaseTracer:
                     {
                         "id": str(interaction_id),
                         "span_id": span.id,
-                        "interaction_type": "agent_end",
+                        "interaction_type": "agent_call_end",
                         "name": span.name,
                         "content": span.data.get("output"),
                         "timestamp": span.end_time,
@@ -760,7 +760,7 @@ class BaseTracer:
                     {
                         "id": str(interaction_id),
                         "span_id": span.id,
-                        "interaction_type": "llm_call_stop",
+                        "interaction_type": "llm_call_end",
                         "name": span.name,
                         "content": {"response": span.data.get("output")},
                         "timestamp": span.end_time,
