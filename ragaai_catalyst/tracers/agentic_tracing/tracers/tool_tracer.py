@@ -265,6 +265,18 @@ class ToolTracerMixin:
                 kwargs["component_id"], []
             )
 
+        # Get tags, metrics
+        name = kwargs["name"]
+        # tags
+        tags = []
+        if name in self.span_attributes_dict:
+            tags = self.span_attributes_dict[name].tags or []
+
+        # metrics
+        metrics = []
+        if name in self.span_attributes_dict:
+            metrics = self.span_attributes_dict[name].metrics or []
+
         start_time = kwargs["start_time"]
         component = {
             "id": kwargs["component_id"],
@@ -280,14 +292,14 @@ class ToolTracerMixin:
                 "tool_type": kwargs["tool_type"],
                 "version": kwargs["version"],
                 "memory_used": kwargs["memory_used"],
-                "tags": self.span_attributes_dict[kwargs["name"]].tags or [],
+                "tags": tags,
             },
             "data": {
                 "input": kwargs["input_data"],
                 "output": kwargs["output_data"],
                 "memory_used": kwargs["memory_used"],
             },
-            "metrics": self.span_attributes_dict[kwargs["name"]].metrics or [],
+            "metrics": metrics,
             "network_calls": network_calls,
             "interactions": interactions,
         }
