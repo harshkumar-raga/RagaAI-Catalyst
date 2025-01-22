@@ -139,7 +139,7 @@ class AgenticTracing(
         self.network_tracer.network_calls = []  # Reset for next component
         # self.component_user_interaction[component_id] = [interaction for interaction in self.user_interaction_tracer.interactions if interaction.get('component_id') == component_id]
         for interaction in self.user_interaction_tracer.interactions:
-            interaction_component_id = interaction.get('component_id')
+            interaction_component_id = interaction.get("component_id")
             if interaction_component_id not in self.component_user_interaction:
                 self.component_user_interaction[interaction_component_id] = []
             if interaction not in self.component_user_interaction[interaction_component_id]:
