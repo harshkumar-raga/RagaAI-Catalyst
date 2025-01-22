@@ -91,7 +91,6 @@ class CustomTracerMixin:
                         pass
                 return trace_variables_func
 
-            sys.settrace(trace_variables_func)
 
         # Start tracking network calls for this component
         self.start_component(component_id)
@@ -186,8 +185,6 @@ class CustomTracerMixin:
                     except:
                         pass
                 return trace_variables_func
-
-            sys.settrace(trace_variables_func)
 
         try:
             # Execute the function
