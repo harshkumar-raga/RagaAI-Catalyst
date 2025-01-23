@@ -143,7 +143,7 @@ class ToolTracerMixin:
 
             # End tracking network calls for this component
             self.end_component(component_id)
-
+            
             # Create tool component
             tool_component = self.create_tool_component(
                 component_id=component_id,
@@ -261,9 +261,7 @@ class ToolTracerMixin:
             network_calls = self.component_network_calls.get(kwargs["component_id"], [])
         interactions = []
         if self.auto_instrument_user_interaction:
-            interactions = self.component_user_interaction.get(
-                kwargs["component_id"], []
-            )
+            interactions = self.component_user_interaction.get(kwargs["component_id"], [])
 
         # Get tags, metrics
         name = kwargs["name"]

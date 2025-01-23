@@ -468,7 +468,7 @@ class LLMTracerMixin:
                 parameters=parameters,
             )
 
-            # self.add_component(llm_component)
+            self.add_component(llm_component)
             self.llm_data = llm_component
 
             return result
@@ -587,7 +587,6 @@ class LLMTracerMixin:
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
-            self.add_component(llm_component, is_error=True)
             llm_component = self.create_llm_component(
                 component_id=component_id,
                 hash_id=hash_id,
@@ -601,6 +600,7 @@ class LLMTracerMixin:
                 error=error_component,
             )
             self.llm_data = llm_component
+            self.add_component(llm_component, is_error=True)
 
             raise
 
