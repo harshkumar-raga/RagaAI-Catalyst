@@ -218,7 +218,7 @@ class Component:
                             id=interaction.get("id", str(uuid.uuid4())),
                             type=interaction.get("interaction_type", ""),
                             content=str(interaction.get("content", "")),
-                            timestamp=interaction.get("timestamp", datetime.utcnow().isoformat())
+                            timestamp=interaction.get("timestamp", datetime.now().astimezone().isoformat())
                         )
                     )
                 else:

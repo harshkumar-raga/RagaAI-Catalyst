@@ -708,7 +708,7 @@ class LLMTracerMixin:
                 parent_agent_id = self.current_agent_id.get()
                 self.start_component(component_id)
 
-                start_time = datetime.now()
+                start_time = datetime.now().astimezone().isoformat()
                 error_info = None
                 result = None
 

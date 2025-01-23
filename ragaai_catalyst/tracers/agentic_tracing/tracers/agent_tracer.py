@@ -117,7 +117,7 @@ class AgentTracerMixin:
                         agent_type=agent_type,
                         version=version,
                         capabilities=capabilities or [],
-                        start_time=datetime.now(),
+                        start_time=datetime.now().astimezone().isoformat(),
                         memory_used=0,
                         input_data=tracer._sanitize_input(args, kwargs),
                         output_data=None,
@@ -167,7 +167,7 @@ class AgentTracerMixin:
                                     children_token = tracer.agent_children.set([])
 
                                     try:
-                                        start_time = datetime.now()
+                                        start_time = datetime.now().astimezone().isoformat()
                                         result = method(self, *args, **kwargs)
 
                                         # Update agent component with method result
@@ -183,7 +183,7 @@ class AgentTracerMixin:
                                                     tracer._sanitize_input(args, kwargs)
                                                 )
                                                 component["start_time"] = (
-                                                    start_time.isoformat()
+                                                    start_time
                                                 )
 
                                                 # Get children accumulated during method execution
@@ -265,7 +265,7 @@ class AgentTracerMixin:
         if not self.auto_instrument_agent:
             return func(*args, **kwargs)
 
-        start_time = datetime.now()
+        start_time = datetime.now().astimezone().isoformat()
         self.start_time = start_time
         self.input_data = self._sanitize_input(args, kwargs)
         start_memory = psutil.Process().memory_info().rss
@@ -390,7 +390,7 @@ class AgentTracerMixin:
         if not self.auto_instrument_agent:
             return await func(*args, **kwargs)
 
-        start_time = datetime.now()
+        start_time = datetime.now().astimezone().isoformat()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
 
@@ -533,7 +533,7 @@ class AgentTracerMixin:
             "source_hash_id": None,
             "type": "agent",
             "name": kwargs["name"],
-            "start_time": start_time.isoformat(),
+            "start_time": start_time,
             "end_time": datetime.now().astimezone().isoformat(),
             "error": kwargs.get("error"),
             "parent_id": kwargs.get("parent_id"),
