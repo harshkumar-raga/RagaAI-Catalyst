@@ -346,7 +346,7 @@ class AgenticTracing(
                 version=self.version.get(),
                 capabilities=self.capabilities.get(),
                 start_time=self.start_time,
-                end_time=datetime.now(),
+                end_time=datetime.now().astimezone().isoformat(),
                 memory_used=0,
                 input_data=self.input_data,
                 output_data=None,

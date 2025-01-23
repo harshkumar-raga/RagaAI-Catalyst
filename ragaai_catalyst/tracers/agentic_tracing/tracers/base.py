@@ -170,11 +170,11 @@ class BaseTracer:
         self.trace_id = str(uuid.uuid4())
 
         # Get the start time
-        self.start_time = datetime.now().isoformat()
+        self.start_time = datetime.now().astimezone().isoformat()
 
         self.data_key = [
             {
-                "start_time": datetime.now().isoformat(),
+                "start_time": datetime.now().astimezone().isoformat(),
                 "end_time": "",
                 "spans": self.components,
             }
@@ -184,7 +184,7 @@ class BaseTracer:
             id=self.trace_id,
             trace_name=self.trace_name,
             project_name=self.project_name,
-            start_time=datetime.now().isoformat(),
+            start_time=datetime.now().astimezone().isoformat(),
             end_time="",  # Will be set when trace is stopped
             metadata=metadata,
             data=self.data_key,
@@ -194,8 +194,8 @@ class BaseTracer:
     def stop(self):
         """Stop the trace and save to JSON file"""
         if hasattr(self, "trace"):
-            self.trace.data[0]["end_time"] = datetime.now().isoformat()
-            self.trace.end_time = datetime.now().isoformat()
+            self.trace.data[0]["end_time"] = datetime.now().astimezone().isoformat()
+            self.trace.end_time = datetime.now().astimezone().isoformat()
 
             # Change span ids to int
             self.trace = self._change_span_ids_to_int(self.trace)
@@ -284,17 +284,25 @@ class BaseTracer:
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
+    def _process_children(self, children_list, parent_id, current_id):
+        """Helper function to process children recursively."""
+        for child in children_list:
+            child["id"] = current_id
+            child["parent_id"] = parent_id
+            current_id += 1
+            # Recursively process nested children if they exist
+            if "children" in child["data"]:
+                current_id = self._process_children(child["data"]["children"], child["id"], current_id)
+        return current_id
+
     def _change_span_ids_to_int(self, trace):
         id, parent_id = 1, 0
         for span in trace.data[0]["spans"]:
             span.id = id
             span.parent_id = parent_id
             id += 1
-            if span.type == "agent":
-                for children in span.data["children"]:
-                    children["id"] = id
-                    children["parent_id"] = span.id
-                    id += 1
+            if span.type == "agent" and "children" in span.data:
+                id = self._process_children(span.data["children"], span.id, id)
         return trace
 
     def _change_agent_input_output(self, trace):
@@ -445,63 +453,169 @@ class BaseTracer:
     def add_tags(self, tags: List[str]):
         raise NotImplementedError
 
-    # def _add_span_attributes_to_trace(self, trace):
-    #     if not hasattr(trace, 'data'):
-    #         return trace
-    #     for data in trace.data:
-    #         for span in data.get('spans', []):
-    #             if not hasattr(span, 'name'):
-    #                 continue
-    #             span_name = span.name
-    #             if span_name in self.span_attributes_dict:
-    #                 span_attributes = self.span_attributes_dict[span_name]
-    #                 span = self._add_span_attributes_to_span(span_attributes, span)
-    #             if hasattr(span, 'type'):
-    #                 if span.type == 'agent':
-    #                     if hasattr(span, 'data'):
-    #                         if 'children' in span.data:
-    #                             span.data['children'] = self._add_span_attributes_to_children(span_attributes, span.data['children'])
+    def _process_child_interactions(self, child, interaction_id, interactions):
+        """
+        Helper method to process child interactions recursively.
+        
+        Args:
+            child (dict): The child span to process
+            interaction_id (int): Current interaction ID
+            interactions (list): List of interactions to append to
+            
+        Returns:
+            int: Next interaction ID to use
+        """
+        child_type = child.get("type")
+        
+        if child_type == "tool":
+            # Tool call start
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "tool_call_start",
+                    "name": child.get("name"),
+                    "content": {
+                        "parameters": [
+                            child.get("data", {}).get("input", {}).get("args"),
+                            child.get("data", {}).get("input", {}).get("kwargs"),
+                        ]
+                    },
+                    "timestamp": child.get("start_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
 
-    #     return trace
+            # Tool call end
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "tool_call_end",
+                    "name": child.get("name"),
+                    "content": {
+                        "returns": child.get("data", {}).get("output"),
+                    },
+                    "timestamp": child.get("end_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
 
-    # def _add_span_attributes_to_children(self, span_attributes: SpanAttributes, children):
-    #     attributed_children = []
-    #     for child in children:
-    #         if 'name' not in child:
-    #             continue
-    #         child_name = child['name']
-    #         if child_name in self.span_attributes_dict:
-    #             span_attributes = self.span_attributes_dict[child_name]
-    #             child = self._add_span_attributes_to_span(span_attributes, child)
-    #         if 'type' in child:
-    #             if child['type'] == 'agent':
-    #                 if 'data' in child:
-    #                     if 'children' in child['data']:
-    #                         child['data']['children'] = self._add_span_attributes_to_children(span_attributes, child['data']['children'])
-    #         attributed_children.append(child)
-    #     return attributed_children
+        elif child_type == "llm":
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "llm_call_start",
+                    "name": child.get("name"),
+                    "content": {
+                        "prompt": child.get("data", {}).get("input"),
+                    },
+                    "timestamp": child.get("start_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
 
-    # def _add_span_attributes_to_span(self, span_attributes: SpanAttributes, span):
-    #     metadata = {
-    #         'tags': span_attributes.tags,
-    #         'user_metadata': span_attributes.metadata
-    #     }
-    #     metrics = span_attributes.metrics
-    #     feedback = span_attributes.feedback
-    #     if isinstance(span, dict):
-    #         span['metadata'] = metadata
-    #         span['metrics'] = metrics
-    #         span['feedback'] = feedback
-    #     else:
-    #         span.metadata = metadata
-    #         span.metrics = metrics
-    #         span.feedback = feedback
-    #     return span
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "llm_call_end",
+                    "name": child.get("name"),
+                    "content": {
+                        "response": child.get("data", {}).get("output")
+                    },
+                    "timestamp": child.get("end_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
 
-    def span(self, span_name):
-        if span_name not in self.span_attributes_dict:
-            self.span_attributes_dict[span_name] = SpanAttributes(span_name)
-        return self.span_attributes_dict[span_name]
+        elif child_type == "agent":
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "agent_call_start",
+                    "name": child.get("name"),
+                    "content": None,
+                    "timestamp": child.get("start_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
+
+            # Process nested children recursively
+            if "children" in child.get("data", {}):
+                for nested_child in child["data"]["children"]:
+                    interaction_id = self._process_child_interactions(
+                        nested_child, interaction_id, interactions
+                    )
+
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": "agent_call_end",
+                    "name": child.get("name"),
+                    "content": child.get("data", {}).get("output"),
+                    "timestamp": child.get("end_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
+
+        else:
+            interactions.append(
+                {
+                    "id": str(interaction_id),
+                    "span_id": child.get("id"),
+                    "interaction_type": child_type,
+                    "name": child.get("name"),
+                    "content": child.get("data", {}),
+                    "timestamp": child.get("start_time"),
+                    "error": child.get("error"),
+                }
+            )
+            interaction_id += 1
+
+        # Process additional interactions and network calls
+        if "interactions" in child:
+            for interaction in child["interactions"]:
+                interaction["id"] = str(interaction_id)
+                interaction["span_id"] = child.get("id")
+                interaction["error"] = None
+                interactions.append(interaction)
+                interaction_id += 1
+
+        if "network_calls" in child:
+            for child_network_call in child["network_calls"]:
+                network_call = {}
+                network_call["id"] = str(interaction_id)
+                network_call["span_id"] = child.get("id")
+                network_call["interaction_type"] = "network_call"
+                network_call["name"] = None
+                network_call["content"] = {
+                    "request": {
+                        "url": child_network_call.get("url"),
+                        "method": child_network_call.get("method"),
+                        "headers": child_network_call.get("headers"),
+                    },
+                    "response": {
+                        "status_code": child_network_call.get("status_code"),
+                        "headers": child_network_call.get("response_headers"),
+                        "body": child_network_call.get("response_body"),
+                    },
+                }
+                network_call["timestamp"] = child_network_call.get("start_time")
+                network_call["error"] = child_network_call.get("error")
+                interactions.append(network_call)
+                interaction_id += 1
+
+        return interaction_id
 
     def format_interactions(self) -> dict:
         """
@@ -513,14 +627,14 @@ class BaseTracer:
         tool_call_end, llm_call, file_read, file_write, network_call.
 
         Returns:
-            dict: A dictionary with "interactions" key containing a list of interactions
+            dict: A dictionary with "workflow" key containing a list of interactions
                   sorted by timestamp.
         """
         interactions = []
         interaction_id = 1
 
         if not hasattr(self, "trace") or not self.trace.data:
-            return {"interactions": []}
+            return {"workflow": []}
 
         for span in self.trace.data[0]["spans"]:
             # Process agent spans
@@ -539,159 +653,12 @@ class BaseTracer:
                 )
                 interaction_id += 1
 
-                # Process children of agent
+                # Process children of agent recursively
                 if "children" in span.data:
                     for child in span.data["children"]:
-                        child_type = child.get("type")
-                        if child_type == "tool":
-                            # Tool call start
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "tool_call_start",
-                                    "name": child.get("name"),
-                                    "content": {
-                                        "parameters": [
-                                            child.get("data", {})
-                                            .get("input")
-                                            .get("args"),
-                                            child.get("data", {})
-                                            .get("input")
-                                            .get("kwargs"),
-                                        ]
-                                    },
-                                    "timestamp": child.get("start_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                            # Tool call end
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "tool_call_end",
-                                    "name": child.get("name"),
-                                    "content": {
-                                        "returns": child.get("data", {}).get("output"),
-                                    },
-                                    "timestamp": child.get("end_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                        elif child_type == "llm":
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "llm_call_start",
-                                    "name": child.get("name"),
-                                    "content": {
-                                        "prompt": child.get("data", {}).get("input"),
-                                    },
-                                    "timestamp": child.get("start_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "llm_call_end",
-                                    "name": child.get("name"),
-                                    "content": {
-                                        "response": child.get("data", {}).get("output")
-                                    },
-                                    "timestamp": child.get("end_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                        elif child_type == "agent":
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "agent_call_start",
-                                    "name": child.get("name"),
-                                    "content": None,
-                                    "timestamp": child.get("start_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": "agent_call_end",
-                                    "name": child.get("name"),
-                                    "content": child.get("data", {}).get("output"),
-                                    "timestamp": child.get("end_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                        else:
-                            interactions.append(
-                                {
-                                    "id": str(interaction_id),
-                                    "span_id": child.get("id"),
-                                    "interaction_type": child_type,
-                                    "name": child.get("name"),
-                                    "content": child.get("data", {}),
-                                    "timestamp": child.get("start_time"),
-                                    "error": child.get("error"),
-                                }
-                            )
-                            interaction_id += 1
-
-                        if "interactions" in child:
-                            for interaction in child["interactions"]:
-                                interaction["id"] = str(interaction_id)
-                                interaction["span_id"] = child.get("id")
-                                interaction["error"] = None
-                                interactions.append(interaction)
-                                interaction_id += 1
-
-                        if "network_calls" in child:
-                            for child_network_call in child["network_calls"]:
-                                network_call = {}
-                                network_call["id"] = str(interaction_id)
-                                network_call["span_id"] = child.get("id")
-                                network_call["interaction_type"] = "network_call"
-                                network_call["name"] = None
-                                network_call["content"] = {
-                                    "request": {
-                                        "url": child_network_call.get("url"),
-                                        "method": child_network_call.get("method"),
-                                        "headers": child_network_call.get("headers"),
-                                    },
-                                    "response": {
-                                        "status_code": child_network_call.get(
-                                            "status_code"
-                                        ),
-                                        "headers": child_network_call.get(
-                                            "response_headers"
-                                        ),
-                                        "body": child_network_call.get("response_body"),
-                                    },
-                                }
-                                network_call["timestamp"] = child_network_call[
-                                    "start_time"
-                                ]
-                                network_call["error"] = child_network_call.get("error")
-                                interactions.append(network_call)
-                                interaction_id += 1
+                        interaction_id = self._process_child_interactions(
+                            child, interaction_id, interactions
+                        )
 
                 # Add agent_end interaction
                 interactions.append(
@@ -843,3 +810,8 @@ class BaseTracer:
             interaction["id"] = str(idx)
 
         return {"workflow": sorted_interactions}
+
+    def span(self, span_name):
+        if span_name not in self.span_attributes_dict:
+            self.span_attributes_dict[span_name] = SpanAttributes(span_name)
+        return self.span_attributes_dict[span_name]

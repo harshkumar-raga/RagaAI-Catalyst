@@ -69,7 +69,7 @@ class CustomTracerMixin:
         if not self.is_active or not self.auto_instrument_custom:
             return func(*args, **kwargs)
 
-        start_time = datetime.now().astimezone()
+        start_time = datetime.now().astimezone().isoformat()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
@@ -91,7 +91,6 @@ class CustomTracerMixin:
                         pass
                 return trace_variables_func
 
-            sys.settrace(trace_variables_func)
 
         # Start tracking network calls for this component
         self.start_component(component_id)
@@ -101,7 +100,7 @@ class CustomTracerMixin:
             result = func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
+            end_time = datetime.now().astimezone().isoformat()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -137,7 +136,7 @@ class CustomTracerMixin:
             # End tracking network calls for this component
             self.end_component(component_id)
             
-            end_time = datetime.now().astimezone()
+            end_time = datetime.now().astimezone().isoformat()
             
             custom_component = self.create_custom_component(
                 component_id=component_id,
@@ -156,16 +155,13 @@ class CustomTracerMixin:
 
             self.add_component(custom_component)
             raise
-        finally:
-            if trace_variables:
-                sys.settrace(None)
 
     async def _trace_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
         """Asynchronous version of custom tracing"""
         if not self.is_active or not self.auto_instrument_custom:
             return await func(*args, **kwargs)
 
-        start_time = datetime.now().astimezone()
+        start_time = datetime.now().astimezone().isoformat()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash_simple(func)
@@ -187,14 +183,12 @@ class CustomTracerMixin:
                         pass
                 return trace_variables_func
 
-            sys.settrace(trace_variables_func)
-
         try:
             # Execute the function
             result = await func(*args, **kwargs)
 
             # Calculate resource usage
-            end_time = datetime.now().astimezone()
+            end_time = datetime.now().astimezone().isoformat()
             end_memory = psutil.Process().memory_info().rss
             memory_used = max(0, end_memory - start_memory)
 
@@ -223,7 +217,7 @@ class CustomTracerMixin:
                 "details": {}
             }
             
-            end_time = datetime.now().astimezone()
+            end_time = datetime.now().astimezone().isoformat()
             
             custom_component = self.create_custom_component(
                 component_id=component_id,
@@ -241,9 +235,6 @@ class CustomTracerMixin:
             )
             self.add_component(custom_component)
             raise
-        finally:
-            if trace_variables:
-                sys.settrace(None)
 
     def create_custom_component(self, **kwargs):
         """Create a custom component according to the data structure"""
@@ -263,8 +254,8 @@ class CustomTracerMixin:
             "source_hash_id": None,
             "type": "custom",
             "name": kwargs["name"],
-            "start_time": start_time.isoformat(),
-            "end_time": kwargs["end_time"].isoformat(),
+            "start_time": start_time,
+            "end_time": kwargs["end_time"],
             "error": kwargs.get("error"),
             "parent_id": self.current_agent_id.get() if hasattr(self, 'current_agent_id') else None,
             "info": {
