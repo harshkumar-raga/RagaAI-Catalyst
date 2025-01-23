@@ -58,7 +58,7 @@ class UserInteractionTracer:
             "component_id": self.component_id.get(),
             "interaction_type": "input",
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().astimezone().isoformat()
         })
         return content
 
@@ -70,7 +70,7 @@ class UserInteractionTracer:
             "component_id": self.component_id.get(),
             "interaction_type": "output",
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().astimezone().isoformat()
         })
         return self.original_print(*args, **kwargs)
 

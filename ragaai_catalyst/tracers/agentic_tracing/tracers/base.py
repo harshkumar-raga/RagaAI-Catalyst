@@ -170,11 +170,11 @@ class BaseTracer:
         self.trace_id = str(uuid.uuid4())
 
         # Get the start time
-        self.start_time = datetime.now().isoformat()
+        self.start_time = datetime.now().astimezone().isoformat()
 
         self.data_key = [
             {
-                "start_time": datetime.now().isoformat(),
+                "start_time": datetime.now().astimezone().isoformat(),
                 "end_time": "",
                 "spans": self.components,
             }
@@ -184,7 +184,7 @@ class BaseTracer:
             id=self.trace_id,
             trace_name=self.trace_name,
             project_name=self.project_name,
-            start_time=datetime.now().isoformat(),
+            start_time=datetime.now().astimezone().isoformat(),
             end_time="",  # Will be set when trace is stopped
             metadata=metadata,
             data=self.data_key,
@@ -194,8 +194,8 @@ class BaseTracer:
     def stop(self):
         """Stop the trace and save to JSON file"""
         if hasattr(self, "trace"):
-            self.trace.data[0]["end_time"] = datetime.now().isoformat()
-            self.trace.end_time = datetime.now().isoformat()
+            self.trace.data[0]["end_time"] = datetime.now().astimezone().isoformat()
+            self.trace.end_time = datetime.now().astimezone().isoformat()
 
             # Change span ids to int
             self.trace = self._change_span_ids_to_int(self.trace)
