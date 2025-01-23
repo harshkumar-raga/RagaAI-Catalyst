@@ -665,7 +665,7 @@ class LLMTracerMixin:
                             "type": type(e).__name__,
                             "message": str(e),
                             "traceback": traceback.format_exc(),
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now().astimezone().isoformat(),
                         }
                     }
                     raise
@@ -721,7 +721,7 @@ class LLMTracerMixin:
                             "type": type(e).__name__,
                             "message": str(e),
                             "traceback": traceback.format_exc(),
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now().astimezone().isoformat(),
                         }
                     }
                     raise

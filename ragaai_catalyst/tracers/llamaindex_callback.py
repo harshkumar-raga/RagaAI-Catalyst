@@ -58,7 +58,7 @@ class LlamaIndexTracer:
             ) -> None:
                 trace = {
                     "event_type": event_type,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now().astimezone().isoformat(),
                     "payload": payload,
                     "status": "started",
                     "event_id": event_id,
@@ -82,7 +82,7 @@ class LlamaIndexTracer:
             ) -> None:
                 trace = {
                     "event_type": event_type,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now().astimezone().isoformat(),
                     "payload": payload,
                     "status": "completed",
                     "event_id": event_id,
@@ -220,7 +220,7 @@ class LlamaIndexTracer:
         user_detail["trace_id"] = self._generate_trace_id()
         metadata = user_detail["metadata"]
         metadata["log_source"] = "llamaindex_tracer"
-        metadata["recorded_on"] = datetime.utcnow().isoformat().replace('T', ' ')
+        metadata["recorded_on"] = datetime.now().astimezone().replace('T', ' ')
         user_detail["metadata"] = metadata
         return user_detail
     

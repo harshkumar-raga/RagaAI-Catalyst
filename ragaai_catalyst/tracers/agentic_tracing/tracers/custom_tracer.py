@@ -155,9 +155,6 @@ class CustomTracerMixin:
 
             self.add_component(custom_component)
             raise
-        finally:
-            if trace_variables:
-                sys.settrace(None)
 
     async def _trace_custom_execution(self, func, name, custom_type, version, trace_variables, *args, **kwargs):
         """Asynchronous version of custom tracing"""
@@ -238,9 +235,6 @@ class CustomTracerMixin:
             )
             self.add_component(custom_component)
             raise
-        finally:
-            if trace_variables:
-                sys.settrace(None)
 
     def create_custom_component(self, **kwargs):
         """Create a custom component according to the data structure"""

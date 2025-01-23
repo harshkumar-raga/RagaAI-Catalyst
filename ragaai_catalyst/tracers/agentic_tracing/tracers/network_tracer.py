@@ -105,10 +105,10 @@ def monkey_patch_urllib(network_tracer):
             method = url.get_method()
             url_str = url.full_url
 
-        start_time = datetime.now().astimezone().isoformat()
+        start_time = datetime.now().astimezone()
         try:
             response = original_urlopen(url, data, timeout, *args, **kwargs)
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone()
             network_tracer.record_call(
                 method=method,
                 url=url_str,
@@ -122,7 +122,7 @@ def monkey_patch_urllib(network_tracer):
             )
             return response
         except Exception as e:
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone()
             network_tracer.record_call(
                 method=method,
                 url=url_str,
@@ -144,10 +144,10 @@ def monkey_patch_requests(network_tracer):
     original_request = requests.Session.request
 
     def patched_request(self, method, url, *args, **kwargs):
-        start_time = datetime.now().astimezone().isoformat()
+        start_time = datetime.now().astimezone()
         try:
             response = original_request(self, method, url, *args, **kwargs)
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone() 
             network_tracer.record_call(
                 method=method,
                 url=url,
@@ -161,7 +161,7 @@ def monkey_patch_requests(network_tracer):
             )
             return response
         except Exception as e:
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone() 
             network_tracer.record_call(
                 method=method,
                 url=url,
@@ -184,7 +184,7 @@ def monkey_patch_http_client(network_tracer):
     original_https_request = HTTPSConnection.request
 
     def patched_request(self, method, url, body=None, headers=None, *args, **kwargs):
-        start_time = datetime.now().astimezone().isoformat()
+        start_time = datetime.now().astimezone() 
         try:
             result = (
                 original_http_request(self, method, url, body, headers, *args, **kwargs)
@@ -194,7 +194,7 @@ def monkey_patch_http_client(network_tracer):
                 )
             )
             response = self.getresponse()
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone() 
             network_tracer.record_call(
                 method=method,
                 url=f"{self._http_vsn_str} {self.host}:{self.port}{url}",
@@ -208,7 +208,7 @@ def monkey_patch_http_client(network_tracer):
             )
             return result
         except Exception as e:
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone() 
             network_tracer.record_call(
                 method=method,
                 url=f"{self._http_vsn_str} {self.host}:{self.port}{url}",
@@ -233,10 +233,10 @@ def monkey_patch_socket(network_tracer):
 
     def patched_create_connection(address, *args, **kwargs):
         host, port = address
-        start_time = datetime.now().astimezone().isoformat()
+        start_time = datetime.now().astimezone() 
         try:
             result = original_create_connection(address, *args, **kwargs)
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone()
             network_tracer.record_call(
                 method="CONNECT",
                 url=f"{host}:{port}",
@@ -245,7 +245,7 @@ def monkey_patch_socket(network_tracer):
             )
             return result
         except Exception as e:
-            end_time = datetime.now().astimezone().isoformat()
+            end_time = datetime.now().astimezone() 
             network_tracer.record_call(
                 method="CONNECT",
                 url=f"{host}:{port}",
@@ -265,10 +265,10 @@ def restore_socket(original_create_connection):
 
 async def patch_aiohttp_trace_config(network_tracer):
     async def on_request_start(session, trace_config_ctx, params):
-        trace_config_ctx.start = datetime.now().astimezone().isoformat()
+        trace_config_ctx.start = datetime.now().astimezone()
 
     async def on_request_end(session, trace_config_ctx, params):
-        end_time = datetime.now().astimezone().isoformat()
+        end_time = datetime.now().astimezone() 
         response = params.response
         network_tracer.record_call(
             method=params.method,
