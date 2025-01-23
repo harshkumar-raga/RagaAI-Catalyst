@@ -112,7 +112,7 @@ class UserInteractionTracer:
             "component_id": self.component_id.get(),
             "interaction_type": interaction_type,
             "file_path": file_path,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().astimezone().isoformat()
         }
         interaction.update(kwargs)
         self.interactions.append(interaction)
