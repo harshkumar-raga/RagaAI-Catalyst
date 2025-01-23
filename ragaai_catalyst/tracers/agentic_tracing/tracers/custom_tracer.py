@@ -254,7 +254,7 @@ class CustomTracerMixin:
             "source_hash_id": None,
             "type": "custom",
             "name": kwargs["name"],
-            "start_time": start_time.isoformat(),
+            "start_time": start_time,
             "end_time": kwargs["end_time"].isoformat(),
             "error": kwargs.get("error"),
             "parent_id": self.current_agent_id.get() if hasattr(self, 'current_agent_id') else None,
