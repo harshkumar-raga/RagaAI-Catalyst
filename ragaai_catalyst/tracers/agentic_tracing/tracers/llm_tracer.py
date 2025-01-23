@@ -665,7 +665,7 @@ class LLMTracerMixin:
                             "type": type(e).__name__,
                             "message": str(e),
                             "traceback": traceback.format_exc(),
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now().astimezone().isoformat(),
                         }
                     }
                     raise
@@ -708,7 +708,7 @@ class LLMTracerMixin:
                 parent_agent_id = self.current_agent_id.get()
                 self.start_component(component_id)
 
-                start_time = datetime.now()
+                start_time = datetime.now().astimezone().isoformat()
                 error_info = None
                 result = None
 
@@ -721,7 +721,7 @@ class LLMTracerMixin:
                             "type": type(e).__name__,
                             "message": str(e),
                             "traceback": traceback.format_exc(),
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now().astimezone().isoformat(),
                         }
                     }
                     raise

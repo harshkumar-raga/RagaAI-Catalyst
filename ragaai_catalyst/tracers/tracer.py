@@ -116,7 +116,7 @@ class Tracer(AgenticTracing):
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 30
         self.num_projects = 100
-        self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        self.start_time = datetime.datetime.now().astimezone().isoformat()
 
         if update_llm_cost:
             # First update the model costs file from GitHub
