@@ -69,6 +69,7 @@ class AgenticTracing(
         self.current_component_id = contextvars.ContextVar(
             "current_component_id", default=None
         )
+        self.component_stack = contextvars.ContextVar("component_stack", default=[])  # Add stack to track component hierarchy
         self.network_tracer = NetworkTracer()
 
         # Handle auto_instrumentation
@@ -126,17 +127,31 @@ class AgenticTracing(
 
     def start_component(self, component_id: str):
         """Start tracking network calls for a component"""
-        self.component_network_calls[component_id] = []
-        self.network_tracer.network_calls = []  # Reset network calls
+        # Initialize network calls list for this component if not exists
+        if component_id not in self.component_network_calls:
+            self.component_network_calls[component_id] = []
+        
+        # Reset network tracer for new component
+        self.network_tracer.network_calls = []
+        
+        # Set current component
         self.current_component_id.set(component_id)
         self.user_interaction_tracer.component_id.set(component_id)
+        
+        # Add component to the stack
+        stack = self.component_stack.get()
+        stack.append(component_id)
+        self.component_stack.set(stack)
 
     def end_component(self, component_id: str):
         """End tracking network calls for a component"""
-        self.component_network_calls[component_id] = (
-            self.network_tracer.network_calls.copy()
-        )
-        self.network_tracer.network_calls = []  # Reset for next component
+        # Store network calls for the component
+        for call in self.network_tracer.network_calls:
+            call_component_id = call.get("component_id")
+            if call_component_id not in self.component_network_calls:
+                self.component_network_calls[call_component_id] = []
+            if call not in self.component_network_calls[call_component_id]:
+                self.component_network_calls[call_component_id].append(call)
 
         # Store user interactions for the component
         for interaction in self.user_interaction_tracer.interactions:
@@ -149,14 +164,25 @@ class AgenticTracing(
         # Only reset component_id if it matches the current one
         # This ensures we don't reset a parent's component_id when a child component ends
         if self.current_component_id.get() == component_id:
-            # Get the parent agent's component_id if it exists
-            parent_agent_id = self.current_agent_id.get()
-            # If there's a parent agent, set the component_id back to the parent's
-            if parent_agent_id:
-                self.current_component_id.set(parent_agent_id)
-                self.user_interaction_tracer.component_id.set(parent_agent_id)
+            # Get the current component stack
+            stack = self.component_stack.get()
+            
+            if stack:
+                # Pop the current component from the stack
+                stack.pop()
+                # If there are components left in the stack, set to the last one
+                if stack:
+                    parent_id = stack[-1]
+                    self.current_component_id.set(parent_id)
+                    self.user_interaction_tracer.component_id.set(parent_id)
+                else:
+                    # Stack is empty, reset to None
+                    self.current_component_id.set(None)
+                    self.user_interaction_tracer.component_id.set(None)
+                # Update the stack
+                self.component_stack.set(stack)
             else:
-                # Only reset to None if there's no parent
+                # No stack, reset to None
                 self.current_component_id.set(None)
                 self.user_interaction_tracer.component_id.set(None)
 
