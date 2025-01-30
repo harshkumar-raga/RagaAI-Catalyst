@@ -248,8 +248,9 @@ def sanitize_input(args, kwargs):
 def extract_llm_output(result):
     """Extract output from LLM response"""
     class OutputResponse:
-        def __init__(self, output_response):
+        def __init__(self, output_response, tool_calls=None):
             self.output_response = output_response
+            self.tool_calls = tool_calls
 
     # Handle coroutines
     if asyncio.iscoroutine(result):
@@ -265,6 +266,7 @@ def extract_llm_output(result):
     if hasattr(result, "result"):
         candidates = getattr(result.result, "candidates", [])
         output = []
+        tool_calls = []
         for candidate in candidates:
             content = getattr(candidate, "content", None)
             if content and hasattr(content, "parts"):
@@ -275,7 +277,9 @@ def extract_llm_output(result):
                             "role": getattr(content, "role", "assistant"),
                             "finish_reason": getattr(candidate, "finish_reason", None)
                         })
-        return OutputResponse(output)
+                    elif hasattr(part, 'function_call'):
+                        tool_calls.append(part.function_call.to_dict())
+        return OutputResponse(output, tool_calls)
     
     # Handle Vertex AI format
     # format1
@@ -298,18 +302,21 @@ def extract_llm_output(result):
     
     # Handle OpenAI format
     if hasattr(result, "choices"):
-        return OutputResponse([{
+        openai_output_response = [{
             "content": choice.message.content,
             "role": choice.message.role
-        } for choice in result.choices])
-
+        } for choice in result.choices]
+        openai_tool_calls = [choice.message.tool_call for choice in result.choices if choice.message.tool_call]
+        return OutputResponse(openai_output_response, openai_tool_calls)
 
     # Handle Anthropic format
     if hasattr(result, "content"):
-        return OutputResponse([{
-            "content": result.content[0].text,
+        anthropic_output_response = [{
+            "content": content.text,
             "role": "assistant"
-        }])
+        } for content in result.content if content.type=='text']
+        anthropic_tool_calls = [content.to_dict() for content in result.content if content.type=='tool_use']
+        return OutputResponse(anthropic_output_response, anthropic_tool_calls)
     
     # Default case
     return OutputResponse([{'content': result, 'role': 'assistant'}])
