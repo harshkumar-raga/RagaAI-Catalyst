@@ -4,10 +4,24 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 import os
-load_dotenv()
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing
-from ragaai_catalyst import trace_tool, current_span, trace_agent, trace_llm
+from ragaai_catalyst import trace_tool, current_span, trace_agent
+from langchain.tools.retriever import create_retriever_tool
+from typing import Annotated, Sequence, Literal
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+from langgraph.graph import END, StateGraph, START
+from langgraph.prebuilt import ToolNode
+from langchain import hub
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+from langgraph.prebuilt import tools_condition
+
+load_dotenv()
 
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
@@ -46,8 +60,6 @@ vectorstore = Chroma.from_documents(
 )
 retriever = vectorstore.as_retriever()
 
-from langchain.tools.retriever import create_retriever_tool
-
 retriever_tool = create_retriever_tool(
     retriever,
     "retrieve_blog_posts",
@@ -56,33 +68,11 @@ retriever_tool = create_retriever_tool(
 
 tools = [retriever_tool]
 
-from typing import Annotated, Sequence
-from typing_extensions import TypedDict
-
-from langchain_core.messages import BaseMessage
-
-from langgraph.graph.message import add_messages
-
-
 class AgentState(TypedDict):
     # The add_messages function defines how an update should be processed
     # Default is to replace. add_messages says "append"
     messages: Annotated[Sequence[BaseMessage], add_messages]
     
-from typing import Annotated, Literal, Sequence
-from typing_extensions import TypedDict
-
-from langchain import hub
-from langchain_core.messages import BaseMessage, HumanMessage
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
-
-from pydantic import BaseModel, Field
-
-
-from langgraph.prebuilt import tools_condition
-
 ### Edges
 
 @trace_agent("grade_documents")
@@ -153,7 +143,7 @@ def grade_documents(state) -> Literal["generate", "rewrite"]:
 
 ### Nodes
 
-@tracer.trace_agent("agent")
+@trace_agent("agent")
 def agent(state):
     """
     Invokes the agent model to generate a response based on the current state. Given
@@ -258,9 +248,6 @@ def generate(state):
 
 print("*" * 20 + "Prompt[rlm/rag-prompt]" + "*" * 20)
 prompt = hub.pull("rlm/rag-prompt").pretty_print()  # Show what the prompt looks like
-
-from langgraph.graph import END, StateGraph, START
-from langgraph.prebuilt import ToolNode
 
 # Define a new graph
 workflow = StateGraph(AgentState)

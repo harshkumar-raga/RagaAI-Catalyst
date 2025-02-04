@@ -1,13 +1,22 @@
+"""
+Synchronous LLM Call Tracing Example
+
+Demonstrates RagaAI Catalyst tracing for synchronous OpenAI API calls.
+Tracks:
+    - LLM request/response cycles
+    - API latency
+    - Token usage
+    - Cost
+    - File I/O operations
+"""
+
 import os
-import requests
 from dotenv import load_dotenv
-load_dotenv()
-from litellm import completion
-import openai
 from openai import OpenAI
 from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst
+from ragaai_catalyst import RagaAICatalyst, trace_llm, init_tracing
 
+load_dotenv()
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
@@ -18,15 +27,13 @@ tracer = Tracer(
     project_name="alteryx_copilot-tan",
     dataset_name="testing-1",
     tracer_type="Agentic",
-    auto_instrumentation=
-    {
-        "user_interaction": False,
-        "file_io": True
-    }
+    auto_instrumentation={"user_interaction": False, "file_io": True},
 )
-
+init_tracing(catalyst=catalyst, tracer=tracer)
 tracer.start()
-@tracer.trace_tool(name="llm_call")
+
+
+@trace_llm(name="llm_call")
 def llm_call(prompt, max_tokens=512, model="gpt-3.5-turbo"):
     client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     print(f"Prompt: {prompt}")
@@ -51,6 +58,7 @@ def llm_call(prompt, max_tokens=512, model="gpt-3.5-turbo"):
 def main():
     response = llm_call("how are you?")
     print(f"Response: {response}")
+
 
 if __name__ == "__main__":
     main()
