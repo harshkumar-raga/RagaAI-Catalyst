@@ -27,6 +27,8 @@ class UploadTraces:
             "prompt": {"columnType": "prompt"},
             "response":{"columnType": "response"},
             "context": {"columnType": "context"},
+            "system_prompt": {"columnType": "system_prompt"},
+            "expected_response": {"columnType": "expected_response"},
             "llm_model": {"columnType":"pipeline"},
             "recorded_on": {"columnType": "metadata"},
             "embed_model": {"columnType":"pipeline"},

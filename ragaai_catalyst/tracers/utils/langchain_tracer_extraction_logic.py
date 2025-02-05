@@ -1,9 +1,14 @@
-import json
 import uuid
 
-def langchain_tracer_extraction(data, user_context=""):
+def langchain_tracer_extraction(data, 
+                                project_name,
+                                dataset_name, 
+                                metadata,
+                                pipeline, 
+                                user_context="", 
+                                expected_response=""
+                                ):
     trace_aggregate = {}
-    import uuid
 
     def generate_trace_id():
         """
@@ -12,27 +17,17 @@ def langchain_tracer_extraction(data, user_context=""):
         """
         return '0x'+str(uuid.uuid4()).replace('-', '')
 
+    trace_aggregate["project_name"] = project_name
+    trace_aggregate["dataset_name"] = dataset_name
     trace_aggregate["tracer_type"] = "langchain"
     trace_aggregate['trace_id'] = generate_trace_id()
     trace_aggregate['session_id'] = None
-    trace_aggregate["pipeline"] = {
-        'llm_model': 'gpt-3.5-turbo', 
-        'vector_store': 'faiss',
-        'embed_model': 'text-embedding-ada-002'
-        }
-    trace_aggregate["metadata"] = {
-        'key1': 'value1',
-        'key2': 'value2',
-        'log_source': 'langchain_tracer',
-        'recorded_on': '2024-06-14 08:57:27.324410'
-        }
+    trace_aggregate["pipeline"] = pipeline
+    trace_aggregate["metadata"] = metadata
     trace_aggregate["prompt_length"] = 0
     trace_aggregate["data"] = {}
 
     def get_prompt(data):
-        # if "chain_starts" in data and data["chain_starts"] != []:
-        #     for item in data["chain_starts"]:
-
         if "chat_model_calls" in data and data["chat_model_calls"] != []:
             for item in data["chat_model_calls"]:
                 messages = item["messages"][0]
@@ -49,7 +44,6 @@ def langchain_tracer_extraction(data, user_context=""):
     def get_response(data):
         for item in data["llm_calls"]:
             if item["event"] == "llm_end":
-                # import pdb; pdb.set_trace()
                 llm_end_responses = item["response"]["generations"][0]
                 for llm_end_response in llm_end_responses:
                     response = llm_end_response["text"]
@@ -63,21 +57,30 @@ def langchain_tracer_extraction(data, user_context=""):
                 if item["event"] == "retriever_end":
                     context = item["documents"][0]["page_content"].replace('\n', ' ')
                     return context
-        # if "chat_model_calls" in data and data["chat_model_calls"] != []:
-        #     for item in data["chat_model_calls"]:
-        #         messages = item["messages"][0]
-        #         for message in messages:
-        #             if message["type"]=="system":
-        #                 content = message["content"].strip().replace('\n', ' ')
-        #                 return content
 
+    def get_system_prompt(data):
+        if "chat_model_calls" in data and data["chat_model_calls"] != []:
+            for item in data["chat_model_calls"]:
+                messages = item["messages"][0]
+                for message in messages:
+                    if message["type"]=="system":
+                        content = message["content"].strip().replace('\n', ' ')
+                        return content
+
+    def get_expected_response(expected_response):
+        if expected_response:
+            return expected_response
 
     prompt = get_prompt(data)
     response = get_response(data)
     context = get_context(data, user_context)
+    system_prompt = get_system_prompt(data)
+    expected_response = get_expected_response(expected_response)
 
     trace_aggregate["data"]["prompt"]=prompt
     trace_aggregate["data"]["response"]=response
     trace_aggregate["data"]["context"]=context
+    trace_aggregate["data"]["system_prompt"]=system_prompt
+    trace_aggregate["data"]["expected_response"]=expected_response
 
-    return trace_aggregate
+    return [trace_aggregate]

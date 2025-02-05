@@ -1,19 +1,20 @@
 import json
 
-def convert_langchain_callbacks_output(result, project_name="", metadata="", pipeline=""):
+def convert_langchain_callbacks_output(result):
+
     initial_struc = [{
-        "project_name": project_name,
-        "trace_id": "NA",
-        "session_id": "NA",
-        "metadata" : metadata,
-        "pipeline" : pipeline,
+        "project_name": result[0]["project_name"],
+        "trace_id": result[0]["trace_id"],
+        "session_id": result[0]["session_id"],
+        "metadata" : result[0]["metadata"],
+        "pipeline" : result[0]["pipeline"],
         "traces" : []
     }]
     traces_data = []
 
-    prompt = result["data"]["prompt"]
-    response = result["data"]["response"]
-    context = result["data"]["context"]
+    prompt = result[0]["data"]["prompt"]
+    response = result[0]["data"]["response"]
+    context = result[0]["data"]["context"]
     final_prompt = ""
 
     prompt_structured_data = {
