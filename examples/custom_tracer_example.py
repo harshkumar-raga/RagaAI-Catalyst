@@ -7,20 +7,13 @@ of a custom tracer to monitor and log application events.
 
 """
 
-from dotenv import load_dotenv
 import os
-from pathlib import Path
+import requests
+from dotenv import load_dotenv
 from ragaai_catalyst.tracers import Tracer, trace_custom
 from ragaai_catalyst import RagaAICatalyst, init_tracing
-import requests
-import sys
 
 load_dotenv()
-
-# Add the project root to sys.path
-project_root = Path(__file__).resolve().parent
-sys.path.append(str(project_root))
-
 
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
@@ -39,17 +32,16 @@ tracer = Tracer(
         "embed_model": "text-embedding-ada-002",
     },
 )
-load_dotenv()
+
 init_tracing(catalyst=catalyst, tracer=tracer)
-tracer.start()
 
-
+# Using the trace_custom decorator to trace custom functions
 @trace_custom(name="process_data", custom_type="data_processor", trace_variables=False)
 def process_data(data):
     """Example function showing custom function tracing with line traces"""
     processed = []
     total = 0
-    print("my name is khan1")
+    print("Tracing using custom tracer")
     for i, item in enumerate(data):
         value = item * 2
         total += value
@@ -61,9 +53,7 @@ def process_data(data):
     return processed
 
 
-@trace_custom(
-    name="calculate_statistics", custom_type="data_processor", trace_variables=False
-)
+@trace_custom(name="calculate_statistics", custom_type="data_processor", trace_variables=False)
 def calculate_statistics(numbers):
     """Example function using the trace_custom decorator without line traces"""
     stats = {}
@@ -80,12 +70,12 @@ def calculate_statistics(numbers):
     diff = max_val - min_val
     stats["range"] = diff
 
-    print("my name is khan2")
+    print("Tracing using custom tracer")
     print("stats are", stats)
 
     return stats
 
-
+# Using the trace_custom decorator to trace custom function weather_tool
 @trace_custom(name="network_call", custom_type="network_call", trace_variables=True)
 def weather_tool(destination="kerela"):
     api_key = os.environ.get("OPENWEATHERMAP_API_KEY")
@@ -124,5 +114,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-    tracer.stop()
+    with tracer:
+        main()

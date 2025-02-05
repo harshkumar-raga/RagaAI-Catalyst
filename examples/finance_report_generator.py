@@ -1,23 +1,13 @@
-"""
-Financial Market Analysis Tracer
-
-This module demonstrates RagaAI Catalyst's tracing capabilities for financial market analysis:
-
-Traced Operations:
-    - Website scraping tool of financial news
-    - Sentiment analysis of market content
-    - Report generation using LLMs
-
-"""
-
+import os
+import json
 import requests
+from urllib.parse import urlparse
+from typing import List, Dict
+from dotenv import load_dotenv
+
 from bs4 import BeautifulSoup
 from litellm import completion
-import os
-from typing import List, Dict
-import json
-from urllib.parse import urlparse
-from dotenv import load_dotenv
+
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import (
     RagaAICatalyst,
@@ -26,6 +16,7 @@ from ragaai_catalyst import (
     trace_agent,
     init_tracing,
 )
+
 
 load_dotenv()
 
@@ -42,10 +33,11 @@ tracer = Tracer(
     tracer_type="Agentic",
 )
 init_tracing(catalyst=catalyst, tracer=tracer)
-tracer.start()
 
 
 class FinancialReportGenerator:
+    # We can trace the tools using the @trace_tool decorator
+    # Using the @trace_tool decorator will trace tool scrape_website
     @trace_tool("scrape_website")
     def scrape_website(self, url: str) -> str:
         """
@@ -68,6 +60,7 @@ class FinancialReportGenerator:
             print(f"Error scraping {url}: {str(e)}")
             return ""
 
+    # Using the @trace_llm decorator will trace llm analyze_sentiment
     @trace_llm(name="analyze_sentiment")
     def analyze_sentiment(self, text: str) -> Dict:
         """
@@ -90,7 +83,8 @@ class FinancialReportGenerator:
         except Exception as e:
             print(f"Error in sentiment analysis: {str(e)}")
             return {"sentiment": "neutral", "confidence": 0, "key_points": []}
-
+        
+    # Using the @trace_llm decorator will trace llm get_report
     @trace_llm(name="get_report")
     def get_report(self, report_prompt: str) -> str:
         response = completion(
@@ -107,6 +101,7 @@ class FinancialReportGenerator:
         print("Report generated successfully.")
         return response.choices[0].message.content
 
+    # Using the @trace_agent decorator to trace the generate_report agent
     @trace_agent(name="generate_report")
     def generate_report(self, urls: List[str]) -> str:
         """
@@ -137,6 +132,7 @@ class FinancialReportGenerator:
         report = self.get_report(report_prompt)
         return report
 
+    # Using the @trace_tool decorator will trace tool create_report_prompt
     @trace_tool("create_report_prompt")
     def _create_report_prompt(
         self, website_contents: List[Dict], sentiments: List[Dict]
@@ -167,14 +163,14 @@ class FinancialReportGenerator:
 
 # Example usage
 if __name__ == "__main__":
-    generator = FinancialReportGenerator()
+    with tracer:
+        generator = FinancialReportGenerator()
 
-    # Example URLs and stock symbols
-    urls = [
-        "https://money.rediff.com/news/market/rupee-hits-record-low-of-85-83-against-us-dollar/20623520250108",
-        "https://indianexpress.com/article/business/banking-and-finance/rbi-asks-credit-bureaus-banks-to-pay-rs-100-compensation-per-day-for-delay-in-data-updation-9765814/",
-    ]
+        # Example URLs and stock symbols
+        urls = [
+            "https://money.rediff.com/news/market/rupee-hits-record-low-of-85-83-against-us-dollar/20623520250108",
+            "https://indianexpress.com/article/business/banking-and-finance/rbi-asks-credit-bureaus-banks-to-pay-rs-100-compensation-per-day-for-delay-in-data-updation-9765814/",
+        ]
 
-    report = generator.generate_report(urls)
-    print(report)
-    tracer.stop()
+        report = generator.generate_report(urls)
+        print(report)

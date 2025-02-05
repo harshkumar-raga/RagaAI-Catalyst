@@ -1,13 +1,34 @@
 import os
-import random
-from dotenv import load_dotenv
-from openai import OpenAI
-from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst, init_tracing
-from ragaai_catalyst import trace_tool, current_span, trace_agent
-import os
+import sqlite3
+import shutil
+import uuid
 import requests
 from dotenv import load_dotenv
+from datetime import date, datetime
+from typing import Optional, Annotated
+from typing_extensions import TypedDict
+import pytz
+import pandas as pd
+import numpy as np
+import openai
+
+from langchain_core.tools import tool
+from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
+from langchain_core.messages import ToolMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_anthropic import ChatAnthropic
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+from langgraph.prebuilt import ToolNode
+from langgraph.graph.message import AnyMessage, add_messages
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph, START
+from langgraph.prebuilt import tools_condition
+
+from ragaai_catalyst.tracers import Tracer
+from ragaai_catalyst import RagaAICatalyst, init_tracing
+
+
 load_dotenv()
 
 catalyst = RagaAICatalyst(
@@ -25,16 +46,9 @@ tracer = Tracer(
 
 init_tracing(catalyst=catalyst, tracer=tracer)
 
-import os
-import shutil
-import sqlite3
-
-import pandas as pd
-import requests
 
 db_url = "https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite"
 local_file = "travel2.sqlite"
-# The backup lets us restart for each tutorial section
 backup_file = "travel2.backup.sqlite"
 overwrite = False
 if overwrite or not os.path.exists(local_file):
@@ -46,7 +60,6 @@ if overwrite or not os.path.exists(local_file):
     shutil.copy(local_file, backup_file)
 
 
-# Convert the flights to present time for our tutorial
 def update_dates(file):
     shutil.copy(backup_file, file)
     conn = sqlite3.connect(file)
@@ -94,12 +107,6 @@ def update_dates(file):
 db = update_dates(local_file)
 
 
-import re
-
-import numpy as np
-import openai
-from langchain_core.tools import tool
-
 response = requests.get(
     "https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md"
 )
@@ -139,7 +146,6 @@ class VectorStoreRetriever:
 retriever = VectorStoreRetriever.from_docs(docs, openai.Client())
 
 @tool
-# @trace_tool("lookup_policy")
 def lookup_policy(query: str) -> str:
     """Consult the company policies to check whether certain options are permitted.
     Use this before making any flight changes performing other 'write' events."""
@@ -147,16 +153,7 @@ def lookup_policy(query: str) -> str:
     return "\n\n".join([doc["page_content"] for doc in docs])
 
 
-
-import sqlite3
-from datetime import date, datetime
-from typing import Optional
-
-import pytz
-from langchain_core.runnables import RunnableConfig
-
 @tool
-# @trace_tool("fetch_user_flight_information")
 def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
     """Fetch all tickets for the user along with corresponding flight information and seat assignments.
 
@@ -173,16 +170,16 @@ def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
     cursor = conn.cursor()
 
     query = """
-    SELECT 
+    SELECT
         t.ticket_no, t.book_ref,
         f.flight_id, f.flight_no, f.departure_airport, f.arrival_airport, f.scheduled_departure, f.scheduled_arrival,
         bp.seat_no, tf.fare_conditions
-    FROM 
+    FROM
         tickets t
         JOIN ticket_flights tf ON t.ticket_no = tf.ticket_no
         JOIN flights f ON tf.flight_id = f.flight_id
         JOIN boarding_passes bp ON bp.ticket_no = t.ticket_no AND bp.flight_id = f.flight_id
-    WHERE 
+    WHERE
         t.passenger_id = ?
     """
     cursor.execute(query, (passenger_id,))
@@ -281,7 +278,6 @@ def update_ticket_to_new_flight(
         conn.close()
         return "No existing ticket found for the given ticket number."
 
-    # Check the signed-in user actually has this ticket
     cursor.execute(
         "SELECT * FROM tickets WHERE ticket_no = ? AND passenger_id = ?",
         (ticket_no, passenger_id),
@@ -292,11 +288,6 @@ def update_ticket_to_new_flight(
         conn.close()
         return f"Current signed-in passenger with ID {passenger_id} not the owner of ticket {ticket_no}"
 
-    # In a real application, you'd likely add additional checks here to enforce business logic,
-    # like "does the new departure airport match the current ticket", etc.
-    # While it's best to try to be *proactive* in 'type-hinting' policies to the LLM
-    # it's inevitably going to get things wrong, so you **also** need to ensure your
-    # API enforces valid behavior
     cursor.execute(
         "UPDATE ticket_flights SET flight_id = ? WHERE ticket_no = ?",
         (new_flight_id, ticket_no),
@@ -327,7 +318,6 @@ def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
         conn.close()
         return "No existing ticket found for the given ticket number."
 
-    # Check the signed-in user actually has this ticket
     cursor.execute(
         "SELECT ticket_no FROM tickets WHERE ticket_no = ? AND passenger_id = ?",
         (ticket_no, passenger_id),
@@ -344,13 +334,6 @@ def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
     cursor.close()
     conn.close()
     return "Ticket successfully cancelled."
-
-
-
-from langchain_core.messages import ToolMessage
-from langchain_core.runnables import RunnableLambda
-
-from langgraph.prebuilt import ToolNode
 
 
 def handle_tool_error(state) -> dict:
@@ -389,23 +372,8 @@ def _print_event(event: dict, _printed: set, max_length=1500):
             _printed.add(message.id)
 
 
-from typing import Annotated
-
-from typing_extensions import TypedDict
-
-from langgraph.graph.message import AnyMessage, add_messages
-
-
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
-
-
-
-from langchain_anthropic import ChatAnthropic
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable, RunnableConfig
-
 
 class Assistant:
     def __init__(self, runnable: Runnable):
@@ -417,8 +385,6 @@ class Assistant:
             passenger_id = configuration.get("passenger_id", None)
             state = {**state, "user_info": passenger_id}
             result = self.runnable.invoke(state)
-            # If the LLM happens to return an empty response, we will re-prompt it
-            # for an actual response.
             if not result.tool_calls and (
                 not result.content
                 or isinstance(result.content, list)
@@ -431,14 +397,8 @@ class Assistant:
         return {"messages": result}
 
 
-# Haiku is faster and cheaper, but less accurate
-# llm = ChatAnthropic(model="claude-3-haiku-20240307")
-llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=1)
-# You could swap LLMs, though you will likely want to update the prompts when
-# doing so!
-# from langchain_openai import ChatOpenAI
 
-# llm = ChatOpenAI(model="gpt-4-turbo-preview")
+llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=1)
 
 primary_assistant_prompt = ChatPromptTemplate.from_messages(
     [
@@ -478,13 +438,7 @@ part_1_tools = [
 part_1_assistant_runnable = primary_assistant_prompt | llm.bind_tools(part_1_tools)
 
 
-
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, StateGraph, START
-from langgraph.prebuilt import tools_condition
-
 builder = StateGraph(State)
-
 
 # Define nodes: these do the work
 builder.add_node("assistant", Assistant(part_1_assistant_runnable))
@@ -502,11 +456,6 @@ builder.add_edge("tools", "assistant")
 memory = MemorySaver()
 part_1_graph = builder.compile(checkpointer=memory)
 
-
-
-
-import shutil
-import uuid
 
 # Let's create an example conversation a user might have with the assistant
 tutorial_questions = [

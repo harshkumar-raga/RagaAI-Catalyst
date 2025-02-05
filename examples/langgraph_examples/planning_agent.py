@@ -1,9 +1,30 @@
-from dotenv import load_dotenv
-load_dotenv()
+"""
+Planning Agent with RagaAI Catalyst Tracing
+
+Implements a ReAct-style planning agent with step-by-step task decomposition
+and execution, traced using RagaAI Catalyst.
+"""
+
 import os
+import asyncio
+import operator
+from dotenv import load_dotenv
+from typing import Annotated, List, Tuple, Union
+from typing_extensions import TypedDict
+from pydantic import BaseModel, Field
+
+from langchain_openai import ChatOpenAI
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_core.prompts import ChatPromptTemplate
+
 from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst, init_tracing
-from ragaai_catalyst import trace_tool, current_span, trace_agent
+from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_agent
+
+from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import create_react_agent
+
+
+load_dotenv()
 
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
@@ -19,20 +40,12 @@ tracer = Tracer(
 )
 
 init_tracing(catalyst=catalyst, tracer=tracer)
-from langchain_community.tools.tavily_search import TavilySearchResults
 tools = [TavilySearchResults(max_results=3)]
-from langchain import hub
-from langchain_openai import ChatOpenAI
 
-from langgraph.prebuilt import create_react_agent
 
 # Choose the LLM that will drive the agent
 llm = ChatOpenAI(model="gpt-4")
 agent_executor = create_react_agent(llm, tools)
-
-import operator
-from typing import Annotated, List, Tuple
-from typing_extensions import TypedDict
 
 
 class PlanExecute(TypedDict):
@@ -40,8 +53,6 @@ class PlanExecute(TypedDict):
     plan: List[str]
     past_steps: Annotated[List[Tuple], operator.add]
     response: str
-    
-from pydantic import BaseModel, Field
 
 
 class Plan(BaseModel):
@@ -50,8 +61,6 @@ class Plan(BaseModel):
     steps: List[str] = Field(
         description="different steps to follow, should be in sorted order"
     )
-    
-from langchain_core.prompts import ChatPromptTemplate
 
 planner_prompt = ChatPromptTemplate.from_messages(
     [
@@ -68,14 +77,11 @@ planner = planner_prompt | ChatOpenAI(
     model="gpt-4o-mini", temperature=0
 ).with_structured_output(Plan)
 
-from typing import Union
-
 
 class Response(BaseModel):
     """Response to user."""
 
     response: str
-
 
 class Act(BaseModel):
     """Action to perform."""
@@ -108,13 +114,13 @@ replanner = replanner_prompt | ChatOpenAI(
     model="gpt-4o-mini", temperature=0
 ).with_structured_output(Act)
 
-from typing import Literal
-from langgraph.graph import END
 
+# We can trace the agents using the `trace_agent` decorator
+# Trace the `execute_step` agent
 @trace_agent("execute_step")
 async def execute_step(state: PlanExecute):
     plan = state["plan"]
-    plan_str = "\n".join(f"{i+1}. {step}" for i, step in enumerate(plan))
+    plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
     task = plan[0]
     task_formatted = f"""For the following plan:
 {plan_str}\n\nYou are tasked with executing step {1}, {task}."""
@@ -125,12 +131,15 @@ async def execute_step(state: PlanExecute):
         "past_steps": [(task, agent_response["messages"][-1].content)],
     }
 
+
+# Using the `trace_agent` decorator to trace the `plan_step` agent
 @trace_agent("plan_step")
 async def plan_step(state: PlanExecute):
     plan = await planner.ainvoke({"messages": [("user", state["input"])]})
     return {"plan": plan.steps}
 
 
+# Using the `trace_agent` decorator to trace the `replan_step` agent
 @trace_agent("replan_step")
 async def replan_step(state: PlanExecute):
     output = await replanner.ainvoke(state)
@@ -145,8 +154,6 @@ def should_end(state: PlanExecute):
         return END
     else:
         return "agent"
-    
-from langgraph.graph import StateGraph, START
 
 workflow = StateGraph(PlanExecute)
 
@@ -179,6 +186,7 @@ workflow.add_conditional_edges(
 # meaning you can use it as you would any other runnable
 app = workflow.compile()
 
+
 async def main():
     config = {"recursion_limit": 20}
     inputs = {"input": "what is the hometown of the mens 2024 Australia open winner?"}
@@ -187,7 +195,7 @@ async def main():
             if k != "__end__":
                 print(v)
 
+
 if __name__ == "__main__":
-    import asyncio
     with tracer:
         asyncio.run(main())

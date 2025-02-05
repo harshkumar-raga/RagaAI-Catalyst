@@ -1,25 +1,37 @@
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
+"""
+Agentic RAG System with RagaAI Catalyst Tracing
+
+Implements an agent-driven Retrieval-Augmented Generation (RAG) system
+with comprehensive tracing via RagaAI Catalyst.
+
+"""
 import os
-from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst, init_tracing
-from ragaai_catalyst import trace_tool, current_span, trace_agent
-from langchain.tools.retriever import create_retriever_tool
+import pprint
+from dotenv import load_dotenv
 from typing import Annotated, Sequence, Literal
 from typing_extensions import TypedDict
-from langgraph.graph.message import add_messages
-from langgraph.graph import END, StateGraph, START
-from langgraph.prebuilt import ToolNode
+
+import langchain
 from langchain import hub
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.tools.retriever import create_retriever_tool
+
 from pydantic import BaseModel, Field
-from langgraph.prebuilt import tools_condition
+
+from ragaai_catalyst.tracers import Tracer
+from ragaai_catalyst import RagaAICatalyst, init_tracing
+from ragaai_catalyst import trace_tool, current_span, trace_agent
+
+from langgraph.graph.message import add_messages
+from langgraph.graph import END, StateGraph, START
+from langgraph.prebuilt import ToolNode, tools_condition
+
 
 load_dotenv()
 
@@ -69,12 +81,12 @@ retriever_tool = create_retriever_tool(
 tools = [retriever_tool]
 
 class AgentState(TypedDict):
-    # The add_messages function defines how an update should be processed
-    # Default is to replace. add_messages says "append"
     messages: Annotated[Sequence[BaseMessage], add_messages]
     
 ### Edges
 
+# We can trace the agent using the `trace_agent` decorator
+# Tracing the `grade_documents` agent using the `trace_agent` decorator 
 @trace_agent("grade_documents")
 def grade_documents(state) -> Literal["generate", "rewrite"]:
     """
@@ -143,6 +155,7 @@ def grade_documents(state) -> Literal["generate", "rewrite"]:
 
 ### Nodes
 
+# Tracing the `agent` agent using the `trace_agent` decorator
 @trace_agent("agent")
 def agent(state):
     """
@@ -170,6 +183,7 @@ def agent(state):
     # We return a list, because this will get added to the existing list
     return {"messages": [response]}
 
+# Tracing the `rewrite` agent using the `trace_agent` decorator
 @trace_agent("rewrite")
 def rewrite(state):
     """
@@ -203,6 +217,8 @@ def rewrite(state):
     response = model.invoke(msg)
     return {"messages": [response]}
 
+# We can trace the tool using the `trace_tool` decorator
+# Using the `trace_tool` decorator to trace the `generate` tool
 @trace_tool("generate")
 def generate(state):
     """
@@ -247,7 +263,7 @@ def generate(state):
 
 
 print("*" * 20 + "Prompt[rlm/rag-prompt]" + "*" * 20)
-prompt = hub.pull("rlm/rag-prompt").pretty_print()  # Show what the prompt looks like
+prompt = hub.pull("rlm/rag-prompt").pretty_print()
 
 # Define a new graph
 workflow = StateGraph(AgentState)
@@ -286,8 +302,6 @@ workflow.add_edge("rewrite", "agent")
 
 # Compile
 graph = workflow.compile()
-
-import pprint
 
 inputs = {
     "messages": [

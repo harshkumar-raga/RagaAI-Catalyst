@@ -1,16 +1,27 @@
-from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst
-from typing import Annotated
-from langchain_anthropic import ChatAnthropic
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
+"""
+Multi-Tool Agent System with RagaAI Catalyst Tracing
+
+Demonstrates integration of multiple search tools (Arxiv, DuckDuckGo)
+with comprehensive tracing via RagaAI Catalyst.
+"""
+
 import json
 import os
+from dotenv import load_dotenv
+from typing import Annotated
+from typing_extensions import TypedDict
+
 from langchain_core.messages import ToolMessage
 from langchain_community.tools.arxiv import ArxivQueryRun
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
-from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+
+from ragaai_catalyst.tracers import Tracer
+from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_llm
+
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+
 load_dotenv()
 
 catalyst = RagaAICatalyst(
@@ -26,7 +37,7 @@ tracer = Tracer(
     tracer_type="Agentic",
 )
 
-tracer.start()
+init_tracing(catalyst=catalyst, tracer=tracer)
 
 # Initialize multiple tools
 arxiv_tool = ArxivQueryRun(max_results=2)
@@ -128,19 +139,18 @@ print("- 'Find recent papers and web results about LangChain'")
 print("- 'Search for tutorials on Python async programming and related research papers'")
 print("- 'What are the latest developments in quantum computing? Include papers and web results'")
 
-while True:
-    try:
-        user_input = input("\nUser: ")
-        if user_input.lower() in ["quit", "exit", "q"]:
-            print("Goodbye!")
+with tracer:
+    while True:
+        try:
+            user_input = input("\nUser: ")
+            if user_input.lower() in ["quit", "exit", "q"]:
+                print("Goodbye!")
+                break
+            
+            stream_graph_updates(user_input)
+            
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
             break
-        
-        stream_graph_updates(user_input)
-        
-    except KeyboardInterrupt:
-        print("\nGoodbye!")
-        break
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-
-tracer.stop()
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
