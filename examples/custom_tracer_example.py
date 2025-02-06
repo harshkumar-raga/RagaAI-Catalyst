@@ -10,17 +10,21 @@ of a custom tracer to monitor and log application events.
 import os
 import requests
 from dotenv import load_dotenv
+
+# Import RagaAI Catalyst for tracing
 from ragaai_catalyst.tracers import Tracer, trace_custom
 from ragaai_catalyst import RagaAICatalyst, init_tracing
 
+# Load environment variables
 load_dotenv()
 
+# Initialize RagaAI Catalyst
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
-# Initialize tracer
+# Set up the tracer to track interactions
 tracer = Tracer(
     project_name="cost_testing",
     dataset_name="sync_sample_llm_testing_openai",
@@ -33,6 +37,7 @@ tracer = Tracer(
     },
 )
 
+# Initialize tracing with RagaAI Catalyst
 init_tracing(catalyst=catalyst, tracer=tracer)
 
 # Using the trace_custom decorator to trace custom functions

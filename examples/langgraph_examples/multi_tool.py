@@ -16,55 +16,44 @@ from langchain_community.tools.arxiv import ArxivQueryRun
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
 from langchain_anthropic import ChatAnthropic
 
+# Import RagaAI Catalyst for tracing
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_llm
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
+# Load environment variables
 load_dotenv()
 
+# Initialize RagaAI Catalyst 
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Initialize tracer
+# Set up the tracer to track interactions
 tracer = Tracer(
     project_name="Langgraph_testing",
     dataset_name="multi_tools",
     tracer_type="Agentic",
 )
 
+# Initialize tracing with RagaAI Catalyst
 init_tracing(catalyst=catalyst, tracer=tracer)
 
 # Initialize multiple tools
-arxiv_tool = ArxivQueryRun(max_results=2)
-ddg_tool = DuckDuckGoSearchRun()
+arxiv_tool = ArxivQueryRun(max_results=2)   # Traced by RagaAI Catalyst
+ddg_tool = DuckDuckGoSearchRun()            # Traced by RagaAI Catalyst
 
 tools = [
-    arxiv_tool,      # For academic papers from ArXiv
-    ddg_tool,        # For web search results
+    arxiv_tool,
+    ddg_tool,
 ]
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-
-# Initialize the graph
-graph_builder = StateGraph(State)
-
-# Setup LLM with tools
-llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
-llm_with_tools = llm.bind_tools(
-    tools,
-    tool_choice="auto",  # Let the model choose which tool to use
-)
-
-def chatbot(state: State):
-    return {"messages": [llm_with_tools.invoke(state["messages"])]}
-
-graph_builder.add_node("chatbot", chatbot)
 
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
@@ -90,11 +79,7 @@ class BasicToolNode:
                 )
             )
         return {"messages": outputs}
-
-# Initialize tool node
-tool_node = BasicToolNode(tools=tools)
-graph_builder.add_node("tools", tool_node)
-
+    
 def route_tools(state: State):
     """Route to tools or end depending on whether tools were requested."""
     messages = state["messages"]
@@ -106,29 +91,56 @@ def route_tools(state: State):
         return "tools"
     return "END"
 
-# Add edges to the graph
-graph_builder.add_conditional_edges(
-    "chatbot",
-    route_tools,
-    {
-        "tools": "tools",
-        "END": END
-    }
-)
+def build_graph():
+    graph_builder = StateGraph(State)
 
-graph_builder.add_edge("tools", "chatbot")
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm_with_tools = llm.bind_tools(
+        tools,
+        tool_choice="auto", 
+    )
 
-# Set the entry point
-graph_builder.set_entry_point("chatbot")
+    def chatbot(state: State):
+        return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
-# Compile the graph
-graph = graph_builder.compile()
+    graph_builder.add_node("chatbot", chatbot)
 
-def stream_graph_updates(user_input: str):
-    """Stream updates from the graph."""
-    config = {"messages": [{"role": "user", "content": user_input}]}
-    for output in graph.stream(config):
-        print(f"Assistant: {output}")
+    tool_node = BasicToolNode(tools=tools)
+    graph_builder.add_node("tools", tool_node)
+
+    # Add edges to the graph
+    graph_builder.add_conditional_edges(
+        "chatbot",
+        route_tools,
+        {
+            "tools": "tools",
+            "END": END
+        }
+    )
+    graph_builder.add_edge("tools", "chatbot")
+    graph_builder.set_entry_point("chatbot")
+    graph = graph_builder.compile()
+    return graph
+
+def main():
+        graph = build_graph()
+        while True:
+            try:
+                user_input = input("\nUser: ")
+                if user_input.lower() in ["quit", "exit", "q"]:
+                    print("Goodbye!")
+                    break
+                
+                config = {"messages": [{"role": "user", "content": user_input}]}
+                for output in graph.stream(config):
+                    print(f"Assistant: {output}")
+                
+            except KeyboardInterrupt:
+                print("\nGoodbye!")
+                break
+            except Exception as e:
+                print(f"An error occurred: {str(e)}")
+
 
 print("Multi-Tool Research Assistant Ready! (Type 'quit' to exit)")
 print("Available tools:")
@@ -139,18 +151,7 @@ print("- 'Find recent papers and web results about LangChain'")
 print("- 'Search for tutorials on Python async programming and related research papers'")
 print("- 'What are the latest developments in quantum computing? Include papers and web results'")
 
+
+# Run the with RagaAI Catalyst tracing
 with tracer:
-    while True:
-        try:
-            user_input = input("\nUser: ")
-            if user_input.lower() in ["quit", "exit", "q"]:
-                print("Goodbye!")
-                break
-            
-            stream_graph_updates(user_input)
-            
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            break
-        except Exception as e:
-            print(f"An error occurred: {str(e)}")
+    main()

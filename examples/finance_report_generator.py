@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from litellm import completion
 
+# Import RagaAI Catalyst for tracing
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import (
     RagaAICatalyst,
@@ -17,23 +18,25 @@ from ragaai_catalyst import (
     init_tracing,
 )
 
-
+# Load environment variables
 load_dotenv()
 
+# Initialize RagaAI Catalyst
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Initialize tracer
+# Set up the tracer to track interactions
 tracer = Tracer(
     project_name="alteryx_copilot-tan",
     dataset_name="testing-3",
     tracer_type="Agentic",
 )
-init_tracing(catalyst=catalyst, tracer=tracer)
 
+# Initialize tracing with RagaAI Catalyst
+init_tracing(catalyst=catalyst, tracer=tracer)
 
 class FinancialReportGenerator:
     # We can trace the tools using the @trace_tool decorator

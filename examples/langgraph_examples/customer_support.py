@@ -26,25 +26,28 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 
+# Import RagaAI Catalyst for tracing
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing
 
-
+# Load environment variables
 load_dotenv()
 
+# Initialize RagaAI Catalyst
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Initialize tracer
+# Set up the tracer to track interactions
 tracer = Tracer(
     project_name="Langgraph_testing",
     dataset_name="customer_support",
     tracer_type="Agentic",
 )
 
+# Initialize tracing with RagaAI Catalyst
 init_tracing(catalyst=catalyst, tracer=tracer)
 
 
@@ -54,10 +57,9 @@ backup_file = "travel2.backup.sqlite"
 overwrite = False
 if overwrite or not os.path.exists(local_file):
     response = requests.get(db_url)
-    response.raise_for_status()  # Ensure the request was successful
+    response.raise_for_status()
     with open(local_file, "wb") as f:
         f.write(response.content)
-    # Backup - we will use this to "reset" our DB in each section
     shutil.copy(local_file, backup_file)
 
 
@@ -148,15 +150,22 @@ retriever = VectorStoreRetriever.from_docs(docs, openai.Client())
 
 @tool
 def lookup_policy(query: str) -> str:
-    """Consult the company policies to check whether certain options are permitted.
-    Use this before making any flight changes performing other 'write' events."""
+    """
+    Traced by RagaAI Catalyst
+    Consult the company policies to check whether certain options are permitted.
+    Use this before making any flight changes performing other 'write' events.
+    """
     docs = retriever.query(query, k=2)
     return "\n\n".join([doc["page_content"] for doc in docs])
 
 
 @tool
 def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
-    """Fetch all tickets for the user along with corresponding flight information and seat assignments.
+
+
+    """ 
+    Traced by RagaAI Catalyst
+    Fetch all tickets for the user along with corresponding flight information and seat assignments.
 
     Returns:
         A list of dictionaries where each dictionary contains the ticket details,
@@ -194,7 +203,7 @@ def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
     return results
 
 
-@tool
+@tool # Traced by RagaAI Catalyst
 def search_flights(
     departure_airport: Optional[str] = None,
     arrival_airport: Optional[str] = None,
@@ -237,7 +246,7 @@ def search_flights(
     return results
 
 
-@tool
+@tool  # Traced by RagaAI Catalyst
 def update_ticket_to_new_flight(
     ticket_no: str, new_flight_id: int, *, config: RunnableConfig
 ) -> str:
@@ -300,7 +309,7 @@ def update_ticket_to_new_flight(
     return "Ticket successfully updated to new flight."
 
 
-@tool
+@tool # Traced by RagaAI Catalyst
 def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
     """Cancel the user's ticket and remove it from the database."""
     configuration = config.get("configurable", {})

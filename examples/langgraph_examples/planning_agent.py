@@ -17,30 +17,35 @@ from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
 
+# Import RagaAI Catalyst for tracing
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_agent
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 
-
+# Load environment variables
 load_dotenv()
 
+# Initialize RagaAI Catalyst
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Initialize tracer
+# Set up the tracer to track interactions
 tracer = Tracer(
     project_name="Trace_testing",
     dataset_name="langgraph_testing",
     tracer_type="Agentic",
 )
 
+# Initialize tracing with RagaAI Catalyst
 init_tracing(catalyst=catalyst, tracer=tracer)
-tools = [TavilySearchResults(max_results=3)]
+
+
+tools = [TavilySearchResults(max_results=3)]  # Traced by RagaAI Catalyst
 
 
 # Choose the LLM that will drive the agent
