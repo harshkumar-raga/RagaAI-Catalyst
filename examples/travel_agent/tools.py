@@ -9,6 +9,9 @@ from ragaai_catalyst import trace_llm, trace_tool, current_span
 # Load environment variables
 load_dotenv()
 
+# We can trace the LLMs using the `@trace_llm` decorator
+# Trace all the LLMs using the `@trace_llm` decorator
+# Using the `@trace_llm` decorator will trace llm `llm_call`
 @trace_llm(name="llm_call", model="gpt-4o-mini")
 def llm_call(prompt, max_tokens=512, model="gpt-4o-mini", name="default"):
     client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -29,6 +32,9 @@ def llm_call(prompt, max_tokens=512, model="gpt-4o-mini", name="default"):
 
     return response.choices[0].message.content.strip()
 
+# We can trace the tools using the `@trace_tool` decorator
+# Trace all the tools using the `@trace_tool` decorator
+# Using the `@trace_tool` decorator will trace tool `weather_tool`
 @trace_tool(name="weather_tool", tool_type="api")
 def weather_tool(destination):
     api_key = os.environ.get("OPENWEATHERMAP_API_KEY")
@@ -50,6 +56,7 @@ def weather_tool(destination):
     except requests.RequestException:
         return "Weather data not available."
 
+# Using the `@trace_tool` decorator will trace tool `currency_converter`
 @trace_tool(name="currency_converter", tool_type="api")
 def currency_converter_tool(amount, from_currency, to_currency):
     api_key = os.environ.get("EXCHANGERATE_API_KEY")
@@ -75,6 +82,7 @@ def currency_converter_tool(amount, from_currency, to_currency):
     except requests.RequestException:
         return None
 
+# Using the `@trace_tool` decorator will trace tool `flight_price_estimator`
 @trace_tool(name="flight_price_estimator", tool_type="mock")
 def flight_price_estimator_tool(origin, destination):
     current_span().add_metrics(

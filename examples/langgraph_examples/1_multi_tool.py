@@ -16,34 +16,34 @@ from langchain_community.tools.arxiv import ArxivQueryRun
 from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
 from langchain_anthropic import ChatAnthropic
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for tracing and monitoring
 from ragaai_catalyst.tracers import Tracer
-from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_llm
+from ragaai_catalyst import RagaAICatalyst, init_tracing
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
-# Load environment variables
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst 
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for monitoring multi tools tracing
 tracer = Tracer(
     project_name="Langgraph_testing",
     dataset_name="multi_tools",
     tracer_type="Agentic",
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
 
-# Initialize multiple tools
+# Tools Arxiv and DuckDuckGo Search are automatically traced by RagaAI Catalyst
 arxiv_tool = ArxivQueryRun(max_results=2)   # Traced by RagaAI Catalyst
 ddg_tool = DuckDuckGoSearchRun()            # Traced by RagaAI Catalyst
 
@@ -56,7 +56,6 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 class BasicToolNode:
-    """A node that runs the tools requested in the last AIMessage."""
 
     def __init__(self, tools: list) -> None:
         self.tools_by_name = {tool.name: tool for tool in tools}
@@ -81,7 +80,6 @@ class BasicToolNode:
         return {"messages": outputs}
     
 def route_tools(state: State):
-    """Route to tools or end depending on whether tools were requested."""
     messages = state["messages"]
     if not messages:
         return "END"
@@ -93,13 +91,11 @@ def route_tools(state: State):
 
 def build_graph():
     graph_builder = StateGraph(State)
-
     llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
     llm_with_tools = llm.bind_tools(
         tools,
         tool_choice="auto", 
     )
-
     def chatbot(state: State):
         return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
@@ -107,8 +103,6 @@ def build_graph():
 
     tool_node = BasicToolNode(tools=tools)
     graph_builder.add_node("tools", tool_node)
-
-    # Add edges to the graph
     graph_builder.add_conditional_edges(
         "chatbot",
         route_tools,
@@ -151,7 +145,6 @@ print("- 'Find recent papers and web results about LangChain'")
 print("- 'Search for tutorials on Python async programming and related research papers'")
 print("- 'What are the latest developments in quantum computing? Include papers and web results'")
 
-
-# Run the with RagaAI Catalyst tracing
+# Step 6: Execute the multi-tool workflow with RagaAI Catalyst
 with tracer:
     main()

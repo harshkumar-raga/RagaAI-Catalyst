@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from litellm import completion
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for tracing and monitoring
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import (
     RagaAICatalyst,
@@ -18,34 +18,32 @@ from ragaai_catalyst import (
     init_tracing,
 )
 
-# Load environment variables
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for financial report generator
 tracer = Tracer(
-    project_name="alteryx_copilot-tan",
-    dataset_name="testing-3",
-    tracer_type="Agentic",
+    project_name="alteryx_copilot-tan",     # Name of the project
+    dataset_name="testing-3",               # Name of the dataset
+    tracer_type="Agentic",                  # Type of tracing
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
 
 class FinancialReportGenerator:
-    # We can trace the tools using the @trace_tool decorator
-    # Using the @trace_tool decorator will trace tool scrape_website
+    # We can trace the tools using the `@trace_tool` decorator
+    # Step 6: Trace all the tools using the `@trace_tool` decorator
+    # Using the `@trace_tool` decorator will trace tool `scrape_website`
     @trace_tool("scrape_website")
     def scrape_website(self, url: str) -> str:
-        """
-        Scrape content from a given URL
-        """
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -53,7 +51,6 @@ class FinancialReportGenerator:
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Remove script and style elements
             for script in soup(["script", "style"]):
                 script.decompose()
 
@@ -63,12 +60,11 @@ class FinancialReportGenerator:
             print(f"Error scraping {url}: {str(e)}")
             return ""
 
-    # Using the @trace_llm decorator will trace llm analyze_sentiment
+    # We can trace the LLMs using the `@trace_llm` decorator
+    # Step 7: Trace all the LLMs using the `@trace_llm` decorator
+    # Using the `@trace_llm` decorator will trace llm `analyze_sentiment`
     @trace_llm(name="analyze_sentiment")
     def analyze_sentiment(self, text: str) -> Dict:
-        """
-        Analyze sentiment of text using LiteLLM
-        """
         try:
             response = completion(
                 model="gpt-3.5-turbo",
@@ -87,7 +83,7 @@ class FinancialReportGenerator:
             print(f"Error in sentiment analysis: {str(e)}")
             return {"sentiment": "neutral", "confidence": 0, "key_points": []}
         
-    # Using the @trace_llm decorator will trace llm get_report
+    # Using the `@trace_llm` decorator will trace llm `get_report`
     @trace_llm(name="get_report")
     def get_report(self, report_prompt: str) -> str:
         response = completion(
@@ -104,18 +100,15 @@ class FinancialReportGenerator:
         print("Report generated successfully.")
         return response.choices[0].message.content
 
-    # Using the @trace_agent decorator to trace the generate_report agent
+    # We can trace the agents using the `@trace_agent` decorator
+    # Step 8: Trace all the agents using the `@trace_agent` decorator
+    # Using the `@trace_agent` decorator to trace the `generate_report` agent
     @trace_agent(name="generate_report")
     def generate_report(self, urls: List[str]) -> str:
-        """
-        Generate a comprehensive financial report from multiple sources
-        """
-        # Collect data from all sources
         website_contents = []
         sentiments = []
 
         print("Processing URLs...")
-        # Process URLs
         for url in urls:
             content = self.scrape_website(url)
             if content:
@@ -123,30 +116,23 @@ class FinancialReportGenerator:
                     {"url": url, "content": content, "domain": urlparse(url).netloc}
                 )
                 print(f"Scraped content from {url}")
-
-                # Analyze sentiment
                 print("Analyzing sentiment...")
                 sentiments.append(self.analyze_sentiment(content))
 
         print("Generating report...")
-        # Generate report using LiteLLM
         report_prompt = self._create_report_prompt(website_contents, sentiments)
 
         report = self.get_report(report_prompt)
         return report
 
-    # Using the @trace_tool decorator will trace tool create_report_prompt
+    # Using the `@trace_tool` decorator will trace tool `create_report_prompt`
     @trace_tool("create_report_prompt")
     def _create_report_prompt(
         self, website_contents: List[Dict], sentiments: List[Dict]
     ) -> str:
         print("Creating report prompt...")
-        """
-        Create a structured prompt for report generation
-        """
         prompt = "Generate a financial report based on the following data:\n\n"
 
-        # Add website content summaries
         prompt += "News and Analysis:\n"
         for content in website_contents:
             prompt += f"Source: {content['domain']}\n"
@@ -164,12 +150,10 @@ class FinancialReportGenerator:
         return prompt
 
 
-# Example usage
+# Step 9: Run the financial report generator with tracer
 if __name__ == "__main__":
     with tracer:
         generator = FinancialReportGenerator()
-
-        # Example URLs and stock symbols
         urls = [
             "https://money.rediff.com/news/market/rupee-hits-record-low-of-85-83-against-us-dollar/20623520250108",
             "https://indianexpress.com/article/business/banking-and-finance/rbi-asks-credit-bureaus-banks-to-pay-rs-100-compensation-per-day-for-delay-in-data-updation-9765814/",

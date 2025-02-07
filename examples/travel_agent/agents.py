@@ -10,6 +10,9 @@ class ItineraryAgent:
     def __init__(self, persona="Itinerary Agent"):
         self.persona = persona
 
+    # We can trace the agents using the `@trace_agent` decorator
+    # Trace all the agents using the `@trace_agent` decorator
+    # Using the `@trace_agent` decorator to trace the `plan_itinerary` agent
     @trace_agent(name="plan_itinerary", agent_type="travel_planner", version="1.0.0")
     def plan_itinerary(self, user_preferences, duration=3):
         # Add metrics for the planning process

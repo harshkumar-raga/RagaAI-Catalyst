@@ -17,38 +17,37 @@ from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.prompts import ChatPromptTemplate
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for tracing and monitoring
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing, trace_agent
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 
-# Load environment variables
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for monitoring planning agent tracing
 tracer = Tracer(
-    project_name="Trace_testing",
-    dataset_name="langgraph_testing",
-    tracer_type="Agentic",
+    project_name="Trace_testing",       # Project name for the trace
+    dataset_name="langgraph_testing",   # Dataset name for the trace
+    tracer_type="Agentic",              # Type of tracing (Agentic)
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
 
 
-tools = [TavilySearchResults(max_results=3)]  # Traced by RagaAI Catalyst
+# tool Tavily search is traced by RagaAI Catalyst
+tools = [TavilySearchResults(max_results=3)]
 
-
-# Choose the LLM that will drive the agent
 llm = ChatOpenAI(model="gpt-4")
 agent_executor = create_react_agent(llm, tools)
 
@@ -61,7 +60,6 @@ class PlanExecute(TypedDict):
 
 
 class Plan(BaseModel):
-    """Plan to follow in future"""
 
     steps: List[str] = Field(
         description="different steps to follow, should be in sorted order"
@@ -121,7 +119,8 @@ replanner = replanner_prompt | ChatOpenAI(
 
 
 # We can trace the agents using the `trace_agent` decorator
-# Trace the `execute_step` agent
+# Step: 6  Trace all the agents using the `trace_agent` decorator
+# Using the `trace_agent` decorator to trace the `execute_step` agent
 @trace_agent("execute_step")
 async def execute_step(state: PlanExecute):
     plan = state["plan"]
@@ -162,35 +161,18 @@ def should_end(state: PlanExecute):
 
 workflow = StateGraph(PlanExecute)
 
-# Add the plan node
 workflow.add_node("planner", plan_step)
-
-# Add the execution step
 workflow.add_node("agent", execute_step)
-
-# Add a replan node
 workflow.add_node("replan", replan_step)
-
 workflow.add_edge(START, "planner")
-
-# From plan we go to agent
 workflow.add_edge("planner", "agent")
-
-# From agent, we replan
 workflow.add_edge("agent", "replan")
-
 workflow.add_conditional_edges(
     "replan",
-    # Next, we pass in the function that will determine which node is called next.
     should_end,
     ["agent", END],
 )
-
-# Finally, we compile it!
-# This compiles it into a LangChain Runnable,
-# meaning you can use it as you would any other runnable
 app = workflow.compile()
-
 
 async def main():
     config = {"recursion_limit": 20}
@@ -202,5 +184,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Step 7: Execute the workflow with RagaAI Catalyst tracer
     with tracer:
         asyncio.run(main())

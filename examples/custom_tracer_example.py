@@ -11,25 +11,25 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for tracing and monitoring
 from ragaai_catalyst.tracers import Tracer, trace_custom
 from ragaai_catalyst import RagaAICatalyst, init_tracing
 
-# Load environment variables
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for monitoring custom tracing
 tracer = Tracer(
-    project_name="cost_testing",
-    dataset_name="sync_sample_llm_testing_openai",
-    tracer_type="anything",
-    metadata={"model": "gpt-3.5-turbo", "environment": "production"},
+    project_name="cost_testing",                                    # Project name for the trace
+    dataset_name="sync_sample_llm_testing_openai",                  # Dataset name for the trace
+    tracer_type="anything",                                          # Type of tracing (Agentic)
+    metadata={"model": "gpt-3.5-turbo", "environment": "production"},   # Additional metadata
     pipeline={
         "llm_model": "gpt-3.5-turbo",
         "vector_store": "faiss",
@@ -37,10 +37,12 @@ tracer = Tracer(
     },
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
 
-# Using the trace_custom decorator to trace custom functions
+# We can use the `trace_custom` decorator to trace custom functions
+# Step 6: Trace all the custom functions using the `trace_custom` decorator
+# Using the trace_custom decorator to trace function process_data
 @trace_custom(name="process_data", custom_type="data_processor", trace_variables=False)
 def process_data(data):
     """Example function showing custom function tracing with line traces"""
@@ -57,7 +59,7 @@ def process_data(data):
 
     return processed
 
-
+# Using the trace_custom decorator to trace function calculate_statistics
 @trace_custom(name="calculate_statistics", custom_type="data_processor", trace_variables=False)
 def calculate_statistics(numbers):
     """Example function using the trace_custom decorator without line traces"""
@@ -105,7 +107,6 @@ def weather_tool(destination="kerela"):
 
 def main():
     try:
-        # Example data processing
         data = [1, 2, 3, 4, 5]
         processed_data = process_data(data)
         print("Processed Data:", processed_data)
@@ -119,5 +120,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # Execute the main function with tracer
     with tracer:
         main()

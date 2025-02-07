@@ -26,30 +26,29 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for comprehensive tracing
 from ragaai_catalyst.tracers import Tracer
 from ragaai_catalyst import RagaAICatalyst, init_tracing
 
-# Load environment variables
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for monitoring customer support interactions
 tracer = Tracer(
-    project_name="Langgraph_testing",
-    dataset_name="customer_support",
-    tracer_type="Agentic",
+    project_name="Langgraph_testing",   # Name of the project
+    dataset_name="customer_support",    # Name of the dataset
+    tracer_type="Agentic",              # Type of tracing
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
-
 
 db_url = "https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite"
 local_file = "travel2.sqlite"
@@ -61,7 +60,6 @@ if overwrite or not os.path.exists(local_file):
     with open(local_file, "wb") as f:
         f.write(response.content)
     shutil.copy(local_file, backup_file)
-
 
 def update_dates(file):
     shutil.copy(backup_file, file)
@@ -106,9 +104,7 @@ def update_dates(file):
 
     return file
 
-
 db = update_dates(local_file)
-
 
 response = requests.get(
     "https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md"
@@ -117,7 +113,6 @@ response.raise_for_status()
 faq_text = response.text
 
 docs = [{"page_content": txt} for txt in re.split(r"(?=\n##)", faq_text)]
-
 
 class VectorStoreRetriever:
     def __init__(self, docs: list, vectors: list, oai_client):
@@ -137,7 +132,6 @@ class VectorStoreRetriever:
         embed = self._client.embeddings.create(
             model="text-embedding-3-small", input=[query]
         )
-        # "@" is just a matrix multiplication in python
         scores = np.array(embed.data[0].embedding) @ self._arr.T
         top_k_idx = np.argpartition(scores, -k)[-k:]
         top_k_idx_sorted = top_k_idx[np.argsort(-scores[top_k_idx])]
@@ -145,32 +139,18 @@ class VectorStoreRetriever:
             {**self._docs[idx], "similarity": scores[idx]} for idx in top_k_idx_sorted
         ]
 
-
 retriever = VectorStoreRetriever.from_docs(docs, openai.Client())
 
+# tools decorated with `@tool` are automatically traced with RagaAI Catalyst
+# Track policy lookup tool
 @tool
 def lookup_policy(query: str) -> str:
-    """
-    Traced by RagaAI Catalyst
-    Consult the company policies to check whether certain options are permitted.
-    Use this before making any flight changes performing other 'write' events.
-    """
     docs = retriever.query(query, k=2)
     return "\n\n".join([doc["page_content"] for doc in docs])
 
-
+# Monitor flight information retrieval
 @tool
 def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
-
-
-    """ 
-    Traced by RagaAI Catalyst
-    Fetch all tickets for the user along with corresponding flight information and seat assignments.
-
-    Returns:
-        A list of dictionaries where each dictionary contains the ticket details,
-        associated flight details, and the seat assignments for each ticket belonging to the user.
-    """
     configuration = config.get("configurable", {})
     passenger_id = configuration.get("passenger_id", None)
     if not passenger_id:
@@ -202,8 +182,8 @@ def fetch_user_flight_information(config: RunnableConfig) -> list[dict]:
 
     return results
 
-
-@tool # Traced by RagaAI Catalyst
+# Monitor flight search operations
+@tool
 def search_flights(
     departure_airport: Optional[str] = None,
     arrival_airport: Optional[str] = None,
@@ -211,7 +191,6 @@ def search_flights(
     end_time: Optional[date | datetime] = None,
     limit: int = 20,
 ) -> list[dict]:
-    """Search for flights based on departure airport, arrival airport, and departure time range."""
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
 
@@ -245,12 +224,11 @@ def search_flights(
 
     return results
 
-
-@tool  # Traced by RagaAI Catalyst
+# Monitor ticket update operations 
+@tool
 def update_ticket_to_new_flight(
     ticket_no: str, new_flight_id: int, *, config: RunnableConfig
 ) -> str:
-    """Update the user's ticket to a new valid flight."""
     configuration = config.get("configurable", {})
     passenger_id = configuration.get("passenger_id", None)
     if not passenger_id:
@@ -308,10 +286,9 @@ def update_ticket_to_new_flight(
     conn.close()
     return "Ticket successfully updated to new flight."
 
-
-@tool # Traced by RagaAI Catalyst
+# Track ticket cancellation operations
+@tool
 def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
-    """Cancel the user's ticket and remove it from the database."""
     configuration = config.get("configurable", {})
     passenger_id = configuration.get("passenger_id", None)
     if not passenger_id:
@@ -345,7 +322,6 @@ def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
     conn.close()
     return "Ticket successfully cancelled."
 
-
 def handle_tool_error(state) -> dict:
     error = state.get("error")
     tool_calls = state["messages"][-1].tool_calls
@@ -359,12 +335,10 @@ def handle_tool_error(state) -> dict:
         ]
     }
 
-
 def create_tool_node_with_fallback(tools: list) -> dict:
     return ToolNode(tools).with_fallbacks(
         [RunnableLambda(handle_tool_error)], exception_key="error"
     )
-
 
 def _print_event(event: dict, _printed: set, max_length=1500):
     current_state = event.get("dialog_state")
@@ -380,7 +354,6 @@ def _print_event(event: dict, _printed: set, max_length=1500):
                 msg_repr = msg_repr[:max_length] + " ... (truncated)"
             print(msg_repr)
             _printed.add(message.id)
-
 
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
@@ -405,8 +378,6 @@ class Assistant:
             else:
                 break
         return {"messages": result}
-
-
 
 llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=1)
 
@@ -450,10 +421,8 @@ part_1_assistant_runnable = primary_assistant_prompt | llm.bind_tools(part_1_too
 
 builder = StateGraph(State)
 
-# Define nodes: these do the work
 builder.add_node("assistant", Assistant(part_1_assistant_runnable))
 builder.add_node("tools", create_tool_node_with_fallback(part_1_tools))
-# Define edges: these determine how the control flow moves
 builder.add_edge(START, "assistant")
 builder.add_conditional_edges(
     "assistant",
@@ -461,13 +430,10 @@ builder.add_conditional_edges(
 )
 builder.add_edge("tools", "assistant")
 
-# The checkpointer lets the graph persist its state
-# this is a complete memory for the entire graph.
 memory = MemorySaver()
 part_1_graph = builder.compile(checkpointer=memory)
 
 
-# Let's create an example conversation a user might have with the assistant
 tutorial_questions = [
     "Hi there, what time is my flight?",
     "Am i allowed to update my flight to something sooner? I want to leave later today.",
@@ -485,22 +451,19 @@ tutorial_questions = [
     # "OK great pick one and book it for my second day there.",
 ]
 
-# Update with the backup file so we can restart from the original place in each section
 db = update_dates(db)
 thread_id = str(uuid.uuid4())
 
 config = {
     "configurable": {
-        # The passenger_id is used in our flight tools to
-        # fetch the user's flight information
         "passenger_id": "3442 587242",
-        # Checkpoints are accessed by thread_id
         "thread_id": thread_id,
     }
 }
 
-
 _printed = set()
+
+# Step 6: Execute the graph with RagaAI tracing enabled
 with tracer:
     for question in tutorial_questions:
         events = part_1_graph.stream(

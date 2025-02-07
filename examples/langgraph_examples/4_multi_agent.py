@@ -23,44 +23,39 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.graph import MessagesState, StateGraph, START, END
 from langgraph.types import Command
 
-# Import RagaAI Catalyst for tracing
+# Step 1: Import RagaAI Catalyst components for tracing and monitoring
 from ragaai_catalyst import RagaAICatalyst, init_tracing
 from ragaai_catalyst.tracers import Tracer
 
-# Load environment variables 
+# Step 2: Load environment variables for RagaAI credentials
 load_dotenv()
 
-# Initialize RagaAI Catalyst
+# Step 3: Initialize RagaAI Catalyst with authentication details
 catalyst = RagaAICatalyst(
     access_key=os.getenv("RAGAAI_CATALYST_ACCESS_KEY"),
     secret_key=os.getenv("RAGAAI_CATALYST_SECRET_KEY"),
     base_url=os.getenv("RAGAAI_CATALYST_BASE_URL"),
 )
 
-# Set up the tracer to track interactions
+# Step 4: Configure tracer for monitoring multi agent interactions
 tracer = Tracer(
-    project_name="Langgraph_testing",    # Project name for the trace
-    dataset_name="multi_agent",          # Dataset name for the trace
-    tracer_type="Agentic",               # Type of tracing (Agentic)
+    project_name="Langgraph_testing",  # Name of the project
+    dataset_name="multi_agent",        # Name of the dataset
+    tracer_type="Agentic",             # Type of tracing
 )
 
-# Initialize tracing with RagaAI Catalyst
+# Step 5: Initialize the tracing system
 init_tracing(catalyst=catalyst, tracer=tracer)
 
-# Tool Definitions
-
-# Tavily Search tool for research, traceable by RagaAI Catalyst
+# Tools Tavily Search and Python REPL are automatically traced by RagaAI Catalyst
 tavily_tool = TavilySearchResults(max_results=1)
 
-# Python REPL tool for code execution
 repl = PythonREPL()
-
 
 @tool
 def python_repl_tool(
     code: Annotated[str, "The python code to execute to generate your chart."],
 ):
-    """Executes Python code to generate a chart, tracing via RagaAI Catalyst."""
     try:
         result = repl.run(code)
     except BaseException as e:
@@ -69,7 +64,6 @@ def python_repl_tool(
     return (
         result_str + "\n\nIf you have completed all tasks, respond with FINAL ANSWER."
     )
-
 
 def make_system_prompt(suffix: str) -> str:
     return (
@@ -82,23 +76,16 @@ def make_system_prompt(suffix: str) -> str:
         f"\n{suffix}"
     )
 
-
 def get_next_node(last_message: BaseMessage, goto: str):
     if "FINAL ANSWER" in last_message.content:
-        # Any agent decided the work is done
         return END
     return goto
 
-
-
 def build_graph():
-    """Build the multi-agent workflow graph and simulate the interaction."""
-
     workflow = StateGraph(MessagesState)
 
     llm = ChatOpenAI(model="gpt-4o-mini")
 
-    # Research agent and node
     research_agent = create_react_agent(
         llm,
         tools=[tavily_tool],
@@ -118,7 +105,6 @@ def build_graph():
         )
         return Command(
             update={
-                # share internal message history of research agent with other agents
                 "messages": result["messages"],
             },
             goto=goto,
@@ -135,31 +121,25 @@ def build_graph():
     def chart_node(state: MessagesState) -> Command[Literal["researcher", END]]:
         result = chart_agent.invoke(state)
         goto = get_next_node(result["messages"][-1], "researcher")
-        # wrap in a human message, as not all providers allow
-        # AI message at the last position of the input messages list
         result["messages"][-1] = HumanMessage(
             content=result["messages"][-1].content, name="chart_generator"
         )
         return Command(
             update={
-                # share internal message history of chart agent with other agents
                 "messages": result["messages"],
             },
             goto=goto,
         )
     
-    # Define workflow structure
     workflow.add_node("researcher", research_node)
     workflow.add_node("chart_generator", chart_node)
     workflow.add_edge(START, "researcher")
 
-    # Compile and return the workflow graph
     return workflow.compile()
 
-
-# Execute the with RagaAI Catalyst tracing
+# Step 6: Execute the multi-agent workflow with RagaAI Catalyst
 with tracer:
-    graph=build_graph()
+    graph = build_graph()
     events = graph.stream({
         "messages": [
             (
@@ -168,8 +148,8 @@ with tracer:
                 "Once you make the chart, finish.",
             )
         ],},
-    # Maximum number of steps to take in the graph
     {"recursion_limit": 30},)
+    
     for s in events:
         print(s)
         print("----")

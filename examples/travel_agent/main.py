@@ -109,6 +109,7 @@ def travel_agent():
     print("\nTravel Summary:")
     print(travel_summary)
 
+# Execute the travel agent with distributed tracing
 if __name__ == "__main__":
     with tracer:
         travel_agent()
