@@ -12,9 +12,9 @@ def convert_langchain_callbacks_output(result):
     }]
     traces_data = []
 
-    prompt = result[0]["data"]["prompt"]
-    response = result[0]["data"]["response"]
-    context = result[0]["data"]["context"]
+    prompt = result[0]["traces"]["prompt"]
+    response = result[0]["traces"]["response"]
+    context = result[0]["traces"]["context"]
     final_prompt = ""
 
     prompt_structured_data = {

@@ -268,15 +268,6 @@ class Tracer(AgenticTracing):
     def stop(self):
         """Stop the tracer and initiate trace upload."""
         if self.tracer_type == "langchain":
-            # if not self.is_instrumented:
-            #     logger.warning("Tracer was not started. No traces to upload.")
-            #     return "No traces to upload"
-
-            # print("Stopping tracer and initiating trace upload...")
-            # self._cleanup()
-            # self._upload_task = self._run_async(self._upload_traces())
-            # self.is_active = False
-            # self.dataset_name = None
             
             user_detail = self._pass_user_data()
             data, additional_metadata = self.langchain_tracer.stop()
@@ -320,15 +311,29 @@ class Tracer(AgenticTracing):
             if additional_metadata:
                 combined_metadata.update(additional_metadata)
 
-            langchain_traces = langchain_tracer_extraction(
-                                data, 
-                                self.project_name, 
-                                self.dataset_name, 
-                                combined_metadata, 
-                                self.pipeline,
-                                self.user_context, 
-                                self.user_gt, 
-                            )
+            @staticmethod
+            def _generate_trace_id():
+                """
+                Generate a random trace ID using UUID4.
+                Returns a string representation of the UUID with no hyphens.
+                """
+                return str(uuid.uuid4())
+        
+            data["tracer_type"] = "langchain"
+            data["trace_id"] = _generate_trace_id()
+            data["project_name"] = self.project_name
+            data["dataset_name"] = self.dataset_name
+            data["metadata"] = combined_metadata
+            data["pipeline"] = self.pipeline
+
+            # Add user_context and user_gt
+            data["user_context"] = self.user_context if self.user_context else None
+            data["user_gt"] = self.user_gt if self.user_gt else None
+
+            langchain_traces = langchain_tracer_extraction(data)
+            with open(os.path.join(os.getcwd(), "langchain_traces.json"), 'w') as f:
+                json.dump(langchain_traces, f, indent=2)
+
             final_result = convert_langchain_callbacks_output(langchain_traces)
             
             # Safely set required fields in final_result

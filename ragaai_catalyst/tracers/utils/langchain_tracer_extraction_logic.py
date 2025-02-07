@@ -1,31 +1,17 @@
 import uuid
 
-def langchain_tracer_extraction(data, 
-                                project_name,
-                                dataset_name, 
-                                metadata,
-                                pipeline, 
-                                user_context="", 
-                                expected_response=""
-                                ):
+def langchain_tracer_extraction(data):
     trace_aggregate = {}
 
-    def generate_trace_id():
-        """
-        Generate a random trace ID using UUID4.
-        Returns a string representation of the UUID with no hyphens.
-        """
-        return '0x'+str(uuid.uuid4()).replace('-', '')
+    trace_aggregate["tracer_type"] = data["tracer_type"]
+    trace_aggregate['trace_id'] = data["trace_id"]
+    trace_aggregate["project_name"] = data["project_name"]
+    trace_aggregate["dataset_name"] = data["dataset_name"]
+    trace_aggregate["metadata"] = data["metadata"]
+    trace_aggregate["pipeline"] = data["pipeline"]
 
-    trace_aggregate["project_name"] = project_name
-    trace_aggregate["dataset_name"] = dataset_name
-    trace_aggregate["tracer_type"] = "langchain"
-    trace_aggregate['trace_id'] = generate_trace_id()
     trace_aggregate['session_id'] = None
-    trace_aggregate["pipeline"] = pipeline
-    trace_aggregate["metadata"] = metadata
-    trace_aggregate["prompt_length"] = 0
-    trace_aggregate["data"] = {}
+    trace_aggregate["traces"] = {}
 
     def get_prompt(data):
         if "chat_model_calls" in data and data["chat_model_calls"] != []:
@@ -49,9 +35,9 @@ def langchain_tracer_extraction(data,
                     response = llm_end_response["text"]
                 return response.strip()
 
-    def get_context(data, user_context):
-        if user_context:
-            return user_context
+    def get_context(data):
+        if data.get("user_context"):
+            return data.get("user_context")
         if "retriever_actions" in data and data["retriever_actions"] != []:
             for item in data["retriever_actions"]:
                 if item["event"] == "retriever_end":
@@ -67,20 +53,19 @@ def langchain_tracer_extraction(data,
                         content = message["content"].strip().replace('\n', ' ')
                         return content
 
-    def get_expected_response(expected_response):
-        if expected_response:
-            return expected_response
+    def get_expected_response(data):
+        return data.get("user_gt") if data.get("user_gt") else None
 
     prompt = get_prompt(data)
     response = get_response(data)
-    context = get_context(data, user_context)
+    context = get_context(data)
     system_prompt = get_system_prompt(data)
-    expected_response = get_expected_response(expected_response)
+    expected_response = get_expected_response(data)
 
-    trace_aggregate["data"]["prompt"]=prompt
-    trace_aggregate["data"]["response"]=response
-    trace_aggregate["data"]["context"]=context
-    trace_aggregate["data"]["system_prompt"]=system_prompt
-    trace_aggregate["data"]["expected_response"]=expected_response
+    trace_aggregate["traces"]["prompt"]=prompt
+    trace_aggregate["traces"]["response"]=response
+    trace_aggregate["traces"]["context"]=context
+    trace_aggregate["traces"]["system_prompt"]=system_prompt
+    trace_aggregate["traces"]["expected_response"]=expected_response
 
     return [trace_aggregate]
