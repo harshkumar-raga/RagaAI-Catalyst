@@ -109,9 +109,8 @@ class LLMTracerMixin:
                 self.patch_vertex_ai_methods, "vertexai.generative_models"
             )
         
-        if self.check_package_available("openai") and self.validate_openai_key():
-            wrapt.register_post_import_hook(self.patch_openai_methods, "openai")
-            wrapt.register_post_import_hook(self.patch_openai_beta_methods, "openai")
+        wrapt.register_post_import_hook(self.patch_openai_methods, "openai")
+        wrapt.register_post_import_hook(self.patch_openai_beta_methods, "openai")
         
         if self.check_package_available("litellm"):
             wrapt.register_post_import_hook(self.patch_litellm_methods, "litellm")
@@ -159,11 +158,15 @@ class LLMTracerMixin:
     def patch_openai_methods(self, module):
         try:
             if hasattr(module, "OpenAI"):
-                client_class = getattr(module, "OpenAI")
-                self.wrap_openai_client_methods(client_class)
+                import openai
+                client_class = openai.OpenAI()
+                if hasattr(client_class.chat.completions, "create"):
+                    self.wrap_openai_client_methods(client_class.chat.completions, "create")
             if hasattr(module, "AsyncOpenAI"):
-                async_client_class = getattr(module, "AsyncOpenAI")
-                self.wrap_openai_client_methods(async_client_class)
+                import openai
+                async_client_class = openai.AsyncOpenAI()
+                if hasattr(async_client_class.chat.completions, "create"):
+                    self.wrap_openai_client_methods(async_client_class.chat.completions, "create")
         except Exception as e:
             # Log the error but continue execution
             print(f"Warning: Failed to patch OpenAI methods: {str(e)}")
@@ -323,39 +326,25 @@ class LLMTracerMixin:
             if hasattr(chat_class, "acomplete"):
                 self.wrap_method(chat_class, "acomplete")
 
-    def wrap_openai_client_methods(self, client_class):
-        original_init = client_class.__init__
+    def wrap_openai_client_methods(self, client_class, method_name):
+        original_init = getattr(client_class, method_name)
 
         @functools.wraps(original_init)
-        def patched_init(client_self, *args, **kwargs):
-            original_init(client_self, *args, **kwargs)
+        def patched_init(*args, **kwargs):
             # Check if this is AsyncOpenAI or OpenAI
             is_async = "AsyncOpenAI" in client_class.__name__
-
+            
             if is_async:
                 # Patch async methods for AsyncOpenAI
-                if hasattr(client_self.chat.completions, "create"):
-                    original_create = client_self.chat.completions.create
-
-                    @functools.wraps(original_create)
-                    async def wrapped_create(*args, **kwargs):
-                        return await self.trace_llm_call(
-                            original_create, *args, **kwargs
-                        )
-                    client_self.chat.completions.create = wrapped_create
+                return self.trace_llm_call(
+                    original_init, *args, **kwargs
+                )
             else:
                 # Patch sync methods for OpenAI
-                if hasattr(client_self.chat.completions, "create"):
-                    original_create = client_self.chat.completions.create
-
-                    @functools.wraps(original_create)
-                    def wrapped_create(*args, **kwargs):
-                        return self.trace_llm_call_sync(
-                            original_create, *args, **kwargs
-                        )
-                    client_self.chat.completions.create = wrapped_create
-
-        setattr(client_class, "__init__", patched_init)
+                return self.trace_llm_call_sync(
+                    original_init, *args, **kwargs
+                )
+        setattr(client_class, method_name, patched_init)
         
     def wrap_langchain_openai_method(self, client_class, method_name):
         method = method_name.split(".")[-1]
