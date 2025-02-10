@@ -48,13 +48,14 @@ class CustomMetric:
     BASE_URL = None
     TIMEOUT = 30
 
-    def __init__(self, project_name, metric_name, description, steps, kwargs):
+    # def __init__(self, project_name, metric_name, description, steps, kwargs):
+    def __init__(self, project_name):
         self.project_name = project_name
         self.num_projects = 99999
-        self.metric_name = metric_name
-        self.description = description
-        self.kwargs = kwargs
-        self.steps = steps
+        # self.metric_name = metric_name
+        # self.description = description
+        # self.kwargs = kwargs
+        # self.steps = steps
         self.timeout = 10
         CustomMetric.BASE_URL = RagaAICatalyst.BASE_URL
 
