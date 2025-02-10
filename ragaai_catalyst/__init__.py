@@ -1,4 +1,4 @@
-from .custommetric import CustomMetric
+from .custom_metric import CustomMetric
 from .experiment import Experiment
 from .ragaai_catalyst import RagaAICatalyst
 from .utils import response_checker
