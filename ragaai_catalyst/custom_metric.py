@@ -112,15 +112,15 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def crete_custom_metrics(self):
+    def crete_custom_metrics(self, metric_name, description):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
         }
         try:
             json_data = {
-                "name": self.metric_name,
-                "description": self.description
+                "name": metric_name,
+                "description": description
             }
             response = requests.post(
                 f'{CustomMetric.BASE_URL}/custom-metric',
