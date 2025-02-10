@@ -96,6 +96,10 @@ class AgentTracerMixin:
                 original_init = target.__init__
 
                 def wrapped_init(self, *args, **kwargs):
+                    gt = kwargs.get("gt") if kwargs else None
+                    if gt is not None:
+                        span = self.span(name)
+                        span.add_gt(gt)
                     # Create component ID only once per instance
                     if not hasattr(self, '_agent_component_id'):
                         component_id = str(uuid.uuid4())
@@ -125,9 +129,13 @@ class AgentTracerMixin:
                             tracer._agent_components = {}
                         tracer._agent_components[component_id] = agent_component
                         
-                        # Only add to hierarchy if this is a root component (no parent)
-                        # or if the parent explicitly added it as a child
-                        if not parent_agent_id:
+                        # Add to parent's children list if parent exists
+                        if parent_agent_id and parent_agent_id in tracer._agent_components:
+                            parent_component = tracer._agent_components[parent_agent_id]
+                            if component_id not in parent_component["children"]:
+                                parent_component["children"].append(component_id)
+                        else:
+                            # If no parent, add as root component
                             tracer.add_component(agent_component)
                     
                     # Call original __init__ with this agent as current
@@ -139,11 +147,59 @@ class AgentTracerMixin:
 
                 # Replace the class's __init__ with our wrapped version
                 target.__init__ = wrapped_init
+
+                # Wrap all methods to maintain parent-child relationship
+                for attr_name, attr_value in target.__dict__.items():
+                    if callable(attr_value) and not attr_name.startswith('__'):
+                        original_method = attr_value
+                        
+                        def create_wrapper(method):
+                            @functools.wraps(method)
+                            def method_wrapper(self, *args, **kwargs):
+                                gt = kwargs.get("gt") if kwargs else None
+                                if gt is not None:
+                                    span = tracer.span(name)
+                                    span.add_gt(gt)
+                                # Use the class instance's agent ID as parent
+                                parent_id = getattr(self, '_agent_component_id', None)
+                                if parent_id:
+                                    if asyncio.iscoroutinefunction(method):
+                                        return tracer._trace_agent_execution(
+                                            method.__get__(self, type(self)),
+                                            name,
+                                            agent_type,
+                                            version,
+                                            capabilities,
+                                            top_level_hash_id,
+                                            *args,
+                                            **kwargs,
+                                        )
+                                    else:
+                                        return tracer._trace_sync_agent_execution(
+                                            method.__get__(self, type(self)),
+                                            name,
+                                            agent_type,
+                                            version,
+                                            capabilities,
+                                            top_level_hash_id,
+                                            *args,
+                                            **kwargs,
+                                        )
+                                else:
+                                    return method(self, *args, **kwargs)
+                            return method_wrapper
+                        
+                        setattr(target, attr_name, create_wrapper(original_method))
+
                 return target
             else:
                 # For non-class targets (e.g., functions), use existing function wrapping logic
                 @functools.wraps(target)
                 def wrapper(*args, **kwargs):
+                    gt = kwargs.get("gt") if kwargs else None
+                    if gt is not None:
+                        span = tracer.span(name)
+                        span.add_gt(gt)
                     if asyncio.iscoroutinefunction(target):
                         return tracer._trace_agent_execution(
                             target,
@@ -185,8 +241,10 @@ class AgentTracerMixin:
         component_id = str(uuid.uuid4())
 
         # Extract ground truth if present
-        ground_truth = kwargs.pop("gt") if kwargs else None
+        ground_truth = kwargs.get("gt")
         if ground_truth is not None:
+            kwargs = dict(kwargs)  # Make a copy to avoid modifying the original
+            kwargs.pop("gt", None)
             span = self.span(name)
             span.add_gt(ground_truth)
 
@@ -306,8 +364,10 @@ class AgentTracerMixin:
         component_id = str(uuid.uuid4())
 
         # Extract ground truth if present
-        ground_truth = kwargs.pop("gt") if kwargs else None
+        ground_truth = kwargs.get("gt")
         if ground_truth is not None:
+            kwargs = dict(kwargs)  # Make a copy to avoid modifying the original
+            kwargs.pop("gt", None)
             span = self.span(name)
             span.add_gt(ground_truth)
 
