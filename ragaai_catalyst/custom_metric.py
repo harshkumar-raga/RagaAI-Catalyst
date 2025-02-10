@@ -192,6 +192,7 @@ class CustomMetric:
                 "customMetricTemplate": custom_metric_template,
                 "variables": variables
             }
+            logger.info(headers)
             response = requests.post(
                 f'{CustomMetric.BASE_URL}/custom-metric/{custom_metric_id}/run',
                 headers=headers,
