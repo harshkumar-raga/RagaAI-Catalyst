@@ -218,7 +218,7 @@ class CustomMetric:
         headers = {
             'Content-Type': 'application/json',
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-            "X-Project-Id": self.project_id,
+            "X-Project-Id": str(self.project_id)
         }
         # Model parameters payload
         parameters_payload = {
