@@ -297,7 +297,7 @@ class CustomMetric:
                 "commitMessage": commit_message
             }
             response = requests.post(
-                f'{CustomMetric.BASE_URL}/custom-metric/{custom_metric_id}/run',
+                f'{CustomMetric.BASE_URL}/custom-metric/{custom_metric_id}/commit',
                 headers=headers,
                 json=custom_metric_payload,
                 timeout=self.timeout)
