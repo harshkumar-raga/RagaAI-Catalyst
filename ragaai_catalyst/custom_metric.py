@@ -163,13 +163,12 @@ class CustomMetric:
             return []
 
     def run_step(self, custom_metric_id, steps, model, provider):
-        project_id = str(self.project_id)
         params_response = self.get_model_parameters(model, provider)
         formatted_parameters = get_extract_parameters(params_response)
 
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-            'X-Project-Id': project_id,
+            'X-Project-Id': str(self.project_id),
         }
         custom_metric_template = {}
 
