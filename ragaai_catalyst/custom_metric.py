@@ -162,7 +162,7 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def run_step(self, custom_metric_id, steps, model, provider, input_variables):
+    def run_step(self, custom_metric_id, steps, model, provider):
         project_id = str(self.project_id)
         params_response = self.get_model_parameters(model, provider)
         formatted_parameters = get_extract_parameters(params_response)
@@ -177,8 +177,9 @@ class CustomMetric:
             "model": f"{provider}/{model}",
             "parameters": formatted_parameters
         }
-        custom_metric_template["steps"] = steps
+        custom_metric_template["steps"] = steps["steps"]
         custom_metric_template["modelSpecs"] = model_specs
+        input_variables = steps["variables"]
         variable_specs = []
         variables = []
         for item in input_variables:
