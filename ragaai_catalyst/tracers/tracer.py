@@ -325,32 +325,17 @@ class Tracer(AgenticTracing):
             data["dataset_name"] = self.dataset_name
             data["metadata"] = combined_metadata
             data["pipeline"] = self.pipeline
+            data["session_id"] = None
 
             # Add user_context and user_gt
             data["user_context"] = self.user_context if self.user_context else None
             data["user_gt"] = self.user_gt if self.user_gt else None
 
-            langchain_traces = langchain_tracer_extraction(data)
-            with open(os.path.join(os.getcwd(), "langchain_traces.json"), 'w') as f:
-                json.dump(langchain_traces, f, indent=2)
+            filepath_3 = os.path.join(os.getcwd(), "final_result.json")
 
-            final_result = convert_langchain_callbacks_output(langchain_traces)
-            
-            # Safely set required fields in final_result
-            if final_result and isinstance(final_result, list) and len(final_result) > 0:
-                final_result[0]['project_name'] = user_detail.get('project_name', '')
-                final_result[0]['trace_id'] = str(uuid.uuid4())
-                final_result[0]['session_id'] = None
-                final_result[0]['metadata'] = combined_metadata
-                final_result[0]['pipeline'] = user_detail.get('trace_user_detail', {}).get('pipeline')
-
-                filepath_3 = os.path.join(os.getcwd(), "final_result.json")
-                with open(filepath_3, 'w') as f:
-                    json.dump(final_result, f, indent=2)
-                
-                print(filepath_3)
-            else:
-                logger.warning("No valid langchain traces found in final_result")
+            # with open(os.path.join(os.getcwd(), "langchain_traces.json"), 'w') as f:
+            with open(filepath_3, 'w') as f:
+                json.dump(data, f, default=str, indent=2)
 
             additional_metadata_keys = list(additional_metadata.keys()) if additional_metadata else None
 
