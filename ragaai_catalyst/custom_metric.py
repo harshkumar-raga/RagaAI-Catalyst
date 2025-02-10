@@ -265,7 +265,7 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def commit_custom_metric(self, custom_metric_id, steps, model, provider, input_variables, final_score, final_reason,
+    def commit_custom_metric(self, custom_metric_id, steps, model, provider, output_steps, final_reason,
                              commit_message):
         project_id = str(self.project_id)
         params_response = self.get_model_parameters(model, provider)
@@ -281,9 +281,10 @@ class CustomMetric:
             "model": f"{provider}/{model}",
             "parameters": formatted_parameters
         }
-        custom_metric_template["steps"] = steps
+        custom_metric_template["steps"] = steps["steps"]
+        input_variables = steps["variables"]
         custom_metric_template["modelSpecs"] = model_specs
-        custom_metric_template["finalScore"] = final_score
+        custom_metric_template["finalScore"] = output_steps[len(output_steps)-1]["output"]["response"]
         custom_metric_template["finalReason"] = final_reason
         variable_specs = []
         for item in input_variables:
