@@ -48,14 +48,9 @@ class CustomMetric:
     BASE_URL = None
     TIMEOUT = 30
 
-    # def __init__(self, project_name, metric_name, description, steps, kwargs):
     def __init__(self, project_name):
         self.project_name = project_name
         self.num_projects = 99999
-        # self.metric_name = metric_name
-        # self.description = description
-        # self.kwargs = kwargs
-        # self.steps = steps
         self.timeout = 10
         CustomMetric.BASE_URL = RagaAICatalyst.BASE_URL
 
@@ -167,15 +162,9 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def run_step(self):
-        custom_metric_id = self.kwargs.get("id")
-        steps = self.steps
-        model = self.kwargs.get("model")
-        provider = self.kwargs.get("provider")
-        input_variables = self.kwargs.get("variables")
+    def run_step(self, custom_metric_id, steps, model, provider, input_variables):
         project_id = str(self.project_id)
-
-        params_response = self.get_model_parameters(model, project_id, provider)
+        params_response = self.get_model_parameters(model, provider)
         formatted_parameters = get_extract_parameters(params_response)
 
         headers = {
@@ -222,13 +211,13 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def get_model_parameters(self, model, project_id, provider):
+    def get_model_parameters(self, model, provider):
         # Get all the model parameters
         parameters_url = f"{CustomMetric.BASE_URL}/playground/providers/models/parameters/list"
         headers = {
             'Content-Type': 'application/json',
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-            "X-Project-Id": project_id,
+            "X-Project-Id": self.project_id,
         }
         # Model parameters payload
         parameters_payload = {
@@ -245,9 +234,7 @@ class CustomMetric:
         params_response.raise_for_status()
         return params_response
 
-    def verify_grading_criteria(self, steps):
-        custom_metric_id = self.kwargs.get("id")
-        grading_criteria = self.kwargs.get("gradingCriteria")
+    def verify_grading_criteria(self, custom_metric_id, grading_criteria, steps):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
@@ -277,18 +264,10 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def commit_custom_metric(self):
-        custom_metric_id = self.kwargs.get("id")
-        steps = self.steps
-        model = self.kwargs.get("model")
-        provider = self.kwargs.get("provider")
-        input_variables = self.kwargs.get("variables")
-        final_score = self.kwargs.get("finalScore")
-        final_reason = self.kwargs.get("finalReason")
-        commit_message = self.kwargs.get("commitMessage")
+    def commit_custom_metric(self, custom_metric_id, steps, model, provider, input_variables, final_score, final_reason,
+                             commit_message):
         project_id = str(self.project_id)
-
-        params_response = self.get_model_parameters(model, project_id, provider)
+        params_response = self.get_model_parameters(model, provider)
         formatted_parameters = get_extract_parameters(params_response)
 
         headers = {
@@ -334,8 +313,7 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def get_custom_metric_versions(self):
-        custom_metric_id = self.kwargs.get("id")
+    def get_custom_metric_versions(self, custom_metric_id):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
@@ -364,9 +342,7 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def deploy_custom_metric(self):
-        custom_metric_id = self.kwargs.get("id")
-        version_name = self.kwargs.get("version_name")
+    def deploy_custom_metric(self, custom_metric_id, version_name):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
