@@ -252,7 +252,7 @@ class CustomMetric:
                 json=json_data,
                 timeout=self.timeout)
             response.raise_for_status()
-            return response.json()['data']["customMetricTemplate"]["steps"]
+            return response.json()['message']
         except requests.exceptions.HTTPError as http_err:
             logger.error(f"HTTP error occurred: {http_err}")
         except requests.exceptions.ConnectionError as conn_err:
