@@ -718,7 +718,7 @@ class LLMTracerMixin:
         if isinstance(input_data, list):
             # Handles list of ChatMessages or dicts
             return "\n".join(
-                msg.get("content", "").strip()
+                msg.get("content", "")
                 if isinstance(msg, dict) and msg.get("content")
                 else str(msg)  # Handles ChatResponse or other objects
                 for msg in input_data
