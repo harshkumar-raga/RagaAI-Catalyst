@@ -13,6 +13,8 @@ import traceback
 import importlib
 import sys
 from litellm import model_cost
+from llama_index.response.schema import ChatResponse 
+
 
 from ..upload.upload_local_metric import calculate_metric
 from ..utils.llm_utils import (
@@ -712,13 +714,31 @@ class LLMTracerMixin:
         return component
 
     def convert_to_content(self, input_data):
-        if isinstance(input_data, dict):
-            messages = input_data.get("kwargs", {}).get("messages", [])
-        elif isinstance(input_data, list):
-            messages = input_data
+        if isinstance(input_data, list):
+            # Handles list of ChatMessages or dicts
+            return "\n".join(
+                msg.get("content", "").strip()
+                if isinstance(msg, dict) and msg.get("content")
+                else str(msg).strip()  # Handles ChatResponse or other objects
+                for msg in input_data
+                if (isinstance(msg, dict) and msg.get("content"))
+                or not isinstance(msg, dict)  # Includes non-dict objects
+            )
+        elif isinstance(input_data, ChatResponse):
+            # Handles single ChatResponse
+            return input_data.message.content.strip() if input_data.message.content else ""
         else:
-            return ""
-        return "\n".join(msg.get("content", "").strip() for msg in messages if msg.get("content"))
+            # Handles single ChatMessage or other objects
+            return str(input_data).strip() if input_data else ""
+
+        # if isinstance(input_data, dict):
+        #     messages = input_data.get("kwargs", {}).get("messages", [])
+        # elif isinstance(input_data, list):
+        #     messages = input_data
+        
+        # else:
+        #     return ""
+        # return "\n".join(msg.get("content", "").strip() for msg in messages if msg.get("content"))
 
     def start_component(self, component_id):
         """Start tracking network calls for a component"""
