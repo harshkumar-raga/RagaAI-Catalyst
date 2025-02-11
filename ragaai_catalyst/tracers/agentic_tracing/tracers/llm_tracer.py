@@ -13,7 +13,7 @@ import traceback
 import importlib
 import sys
 from litellm import model_cost
-from llama_index.response.schema import ChatResponse 
+from llama_index.core.base.llms.types import ChatResponse
 
 
 from ..upload.upload_local_metric import calculate_metric
