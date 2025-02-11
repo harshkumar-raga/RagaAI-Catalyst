@@ -712,25 +712,46 @@ class LLMTracerMixin:
         self.span_attributes_dict[name] = SpanAttributes(name)
 
         return component
-
+    
     def convert_to_content(self, input_data):
-        print(input_data)
-        if isinstance(input_data, list):
-            # Handles list of ChatMessages or dicts
-            return "\n".join(
-                msg.get("content", "")
-                if isinstance(msg, dict) and msg.get("content")
-                else str(msg)  # Handles ChatResponse or other objects
-                for msg in input_data
-                if (isinstance(msg, dict) and msg.get("content"))
-                or not isinstance(msg, dict)  # Includes non-dict objects
-            )
-        elif isinstance(input_data, ChatResponse):
-            # Handles single ChatResponse
-            return input_data.message.content if input_data.message.content else ""
+        print("Here: ",input_data)
+        if hasattr(input_data, "message"):
+        # If it has a 'message' attribute (ChatResponse-like), 
+        # extract and return content as string
+            if hasattr(input_data.message, "content"):
+                return str(input_data.message.content)
+            else:
+                return ""
+        if isinstance(input_data, dict):
+            messages = input_data.get("kwargs", {}).get("messages", [])
+        elif isinstance(input_data, list):
+            messages = input_data
+        
         else:
-            # Handles single ChatMessage or other objects
-            return str(input_data).strip() if input_data else ""
+            return ""
+        return "\n".join(msg.get("content", "").strip() for msg in messages if msg.get("content"))
+
+
+    # def convert_to_content(self, input_data):
+    #     if isinstance(input_data,ChatResponse):
+    #         input_data=str(input_data)
+
+    #     if isinstance(input_data, list):
+    #         # Handles list of ChatMessages or dicts
+    #         return "\n".join(
+    #             msg.get("content", "").strip()
+    #             if isinstance(msg, dict) and msg.get("content")
+    #             else str(msg)  # Handles ChatResponse or other objects
+    #             for msg in input_data
+    #             if (isinstance(msg, dict) and msg.get("content"))
+    #             or not isinstance(msg, dict)  # Includes non-dict objects
+    #         )
+    #     elif isinstance(input_data, ChatResponse):
+    #         # Handles single ChatResponse
+    #         return input_data.message.content if input_data.message.content else ""
+    #     else:
+    #         # Handles single ChatMessage or other objects
+    #         return str(input_data).strip() if input_data else ""
 
         # if isinstance(input_data, dict):
         #     messages = input_data.get("kwargs", {}).get("messages", [])
