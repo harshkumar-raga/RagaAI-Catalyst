@@ -8,40 +8,7 @@ logger = logging.getLogger(__name__)
 get_token = RagaAICatalyst.get_token
 
 
-def get_extract_parameters(params_response):
-    # Extract parameters
-    all_parameters = params_response.json().get('data', [])
-    formatted_parameters = []
-    for param in all_parameters:
-        value = param.get('value')
-        param_type = param.get('type')
 
-        if value is None:
-            formatted_param = {
-                "name": param.get('name'),
-                "value": None,  # Pass None if the value is null
-                "type": param.get('type')
-            }
-        else:
-            # Improved type handling
-            if param_type == "float":
-                value = float(value)  # Ensure value is converted to float
-            elif param_type == "int":
-                value = int(value)  # Ensure value is converted to int
-            elif param_type == "bool":
-                value = bool(value)  # Ensure value is converted to bool
-            elif param_type == "string":
-                value = str(value)  # Ensure value is converted to string
-            else:
-                raise ValueError(f"Unsupported parameter type: {param_type}")  # Handle unsupported types
-
-            formatted_param = {
-                "name": param.get('name'),
-                "value": value,
-                "type": param.get('type')
-            }
-        formatted_parameters.append(formatted_param)
-    return formatted_parameters
 
 
 class CustomMetric:
@@ -107,7 +74,7 @@ class CustomMetric:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def crete_custom_metrics(self, metric_name, description):
+    def create_custom_metrics(self, metric_name, description):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
@@ -164,7 +131,7 @@ class CustomMetric:
 
     def run_step(self, custom_metric_id, steps, model, provider):
         params_response = self.get_model_parameters(model, provider)
-        formatted_parameters = get_extract_parameters(params_response)
+        formatted_parameters = _get_extract_parameters(params_response)
 
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
@@ -269,7 +236,7 @@ class CustomMetric:
                              commit_message):
         project_id = str(self.project_id)
         params_response = self.get_model_parameters(model, provider)
-        formatted_parameters = get_extract_parameters(params_response)
+        formatted_parameters = _get_extract_parameters(params_response)
 
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
@@ -369,3 +336,37 @@ class CustomMetric:
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}")
             return []
+def _get_extract_parameters(params_response):
+    # Extract parameters
+    all_parameters = params_response.json().get('data', [])
+    formatted_parameters = []
+    for param in all_parameters:
+        value = param.get('value')
+        param_type = param.get('type')
+
+        if value is None:
+            formatted_param = {
+                "name": param.get('name'),
+                "value": None,  # Pass None if the value is null
+                "type": param.get('type')
+            }
+        else:
+            # Improved type handling
+            if param_type == "float":
+                value = float(value)  # Ensure value is converted to float
+            elif param_type == "int":
+                value = int(value)  # Ensure value is converted to int
+            elif param_type == "bool":
+                value = bool(value)  # Ensure value is converted to bool
+            elif param_type == "string":
+                value = str(value)  # Ensure value is converted to string
+            else:
+                raise ValueError(f"Unsupported parameter type: {param_type}")  # Handle unsupported types
+
+            formatted_param = {
+                "name": param.get('name'),
+                "value": value,
+                "type": param.get('type')
+            }
+        formatted_parameters.append(formatted_param)
+    return formatted_parameters
