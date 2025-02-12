@@ -13,7 +13,9 @@ import traceback
 import importlib
 import sys
 from litellm import model_cost
+from llama_index.core.base.llms.types import ChatResponse
 
+from .base import BaseTracer
 from ..utils.llm_utils import (
     extract_model_name,
     extract_parameters,
@@ -80,7 +82,6 @@ class LLMTracerMixin:
     def instrument_llm_calls(self):
         """Enable LLM instrumentation"""
         self.auto_instrument_llm = True
-
         # Check currently loaded modules
         if "vertexai" in sys.modules:
             self.patch_vertex_ai_methods(sys.modules["vertexai"])
@@ -97,10 +98,14 @@ class LLMTracerMixin:
             self.patch_langchain_google_methods(sys.modules["langchain_google_vertexai"])
         if "langchain_google_genai" in sys.modules:
             self.patch_langchain_google_methods(sys.modules["langchain_google_genai"])
+
         if "langchain_openai" in sys.modules:
             self.patch_langchain_openai_methods(sys.modules["langchain_openai"])
         if "langchain_anthropic" in sys.modules:
             self.patch_langchain_anthropic_methods(sys.modules["langchain_anthropic"])
+
+        if "llama_index" in sys.modules:
+            self.patch_llama_index_methods(sys.modules["llama_index"])
 
         # Register hooks for future imports with availability checks
         if self.check_package_available("vertexai"):
@@ -114,10 +119,10 @@ class LLMTracerMixin:
         
         if self.check_package_available("litellm"):
             wrapt.register_post_import_hook(self.patch_litellm_methods, "litellm")
-        
+
         if self.check_package_available("anthropic"):
             wrapt.register_post_import_hook(self.patch_anthropic_methods, "anthropic")
-        
+
         if self.check_package_available("google.generativeai"):
             wrapt.register_post_import_hook(
                 self.patch_google_genai_methods, "google.generativeai"
@@ -128,12 +133,16 @@ class LLMTracerMixin:
             wrapt.register_post_import_hook(
                 self.patch_langchain_google_methods, "langchain_google_vertexai"
             )
+
+
+        # Add hooks for llama-index
+        wrapt.register_post_import_hook(self.patch_llama_index_methods, "llama_index")
         
         if self.check_package_available("langchain_google_genai"):
             wrapt.register_post_import_hook(
                 self.patch_langchain_google_methods, "langchain_google_genai"
             )
-            
+
         if self.check_package_available("langchain_openai"):
             wrapt.register_post_import_hook(
                 self.patch_langchain_openai_methods, "langchain_openai"
@@ -150,10 +159,87 @@ class LLMTracerMixin:
     def instrument_network_calls(self):
         """Enable network instrumentation for LLM calls"""
         self.auto_instrument_network = True
-        
+
     def instrument_file_io_calls(self):
         """Enable file IO instrumentation for LLM calls"""
         self.auto_instrument_file_io = True
+
+    def patch_llama_index_methods(self, module):
+        """Patch llama-index LLM methods"""
+        try:
+            # Handle OpenAI LLM from llama-index
+            if hasattr(module, "llms"):
+                # OpenAI
+                if hasattr(module.llms, "openai"):
+                    openai_module = module.llms.openai
+                    if hasattr(openai_module, "OpenAI"):
+                        llm_class = getattr(openai_module, "OpenAI")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+                        self.wrap_method(llm_class, "stream_chat")
+                        # self.wrap_method(llm_class, "stream_achat")
+                        self.wrap_method(llm_class, "stream_complete")
+                        # self.wrap_method(llm_class, "stream_acomplete")
+
+                # Anthropic
+                if hasattr(module.llms, "anthropic"):
+                    anthropic_module = module.llms.anthropic
+                    if hasattr(anthropic_module, "Anthropic"):
+                        llm_class = getattr(anthropic_module, "Anthropic")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+                        self.wrap_method(llm_class, "stream_chat")
+                        # self.wrap_method(llm_class, "stream_achat")
+
+                # Azure OpenAI
+                if hasattr(module.llms, "azure_openai"):
+                    azure_module = module.llms.azure_openai
+                    if hasattr(azure_module, "AzureOpenAI"):
+                        llm_class = getattr(azure_module, "AzureOpenAI")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+                        self.wrap_method(llm_class, "stream_chat")
+                        # self.wrap_method(llm_class, "stream_achat")
+
+                # LiteLLM
+                if hasattr(module.llms, "litellm"):
+                    litellm_module = module.llms.litellm
+                    if hasattr(litellm_module, "LiteLLM"):
+                        llm_class = getattr(litellm_module, "LiteLLM")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+
+                # Vertex AI
+                if hasattr(module.llms, "vertex"):
+                    vertex_module = module.llms.vertex
+                    if hasattr(vertex_module, "Vertex"):
+                        llm_class = getattr(vertex_module, "Vertex")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+
+                # Gemini
+                if hasattr(module.llms, "gemini"):
+                    gemini_module = module.llms.gemini
+                    if hasattr(gemini_module, "Gemini"):
+                        llm_class = getattr(gemini_module, "Gemini")
+                        self.wrap_method(llm_class, "complete")
+                        self.wrap_method(llm_class, "acomplete")
+                        self.wrap_method(llm_class, "chat")
+                        self.wrap_method(llm_class, "achat")
+
+        except Exception as e:
+            # Log the error but continue execution
+            print(f"Warning: Failed to patch llama-index methods: {str(e)}")
 
     def patch_openai_methods(self, module):
         try:
@@ -170,12 +256,12 @@ class LLMTracerMixin:
         except Exception as e:
             # Log the error but continue execution
             print(f"Warning: Failed to patch OpenAI methods: {str(e)}")
-            
+
     def patch_langchain_openai_methods(self, module):
         try:
             if hasattr(module, 'ChatOpenAI'):
                 client_class = getattr(module, "ChatOpenAI")
-                
+
                 if hasattr(client_class, "invoke"):
                     self.wrap_langchain_openai_method(client_class, f"{client_class.__name__}.invoke")
                 elif hasattr(client_class, "run"):
@@ -188,7 +274,7 @@ class LLMTracerMixin:
         except Exception as e:
             # Log the error but continue execution
             print(f"Warning: Failed to patch OpenAI methods: {str(e)}")
-            
+
     def patch_langchain_anthropic_methods(self, module):
         try:
             if hasattr(module, 'ChatAnthropic'):
@@ -214,6 +300,7 @@ class LLMTracerMixin:
         openai.beta.threads.runs.create(...) are automatically traced.
         """
         # Make sure openai_module has a 'beta' attribute
+        openai_module.api_type = "openai"
         if not hasattr(openai_module, "beta"):
             return
 
@@ -241,7 +328,6 @@ class LLMTracerMixin:
                 for method_name in ["create", "retrieve", "list"]:
                     if hasattr(runs_obj, method_name):
                         self.wrap_method(runs_obj, method_name)
-
 
     def patch_anthropic_methods(self, module):
         if hasattr(module, "Anthropic"):
@@ -336,15 +422,28 @@ class LLMTracerMixin:
             
             if is_async:
                 # Patch async methods for AsyncOpenAI
-                return self.trace_llm_call(
-                    original_init, *args, **kwargs
-                )
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+
+                    @functools.wraps(original_create)
+                    async def wrapped_create(*args, **kwargs):
+                        return await self.trace_llm_call(
+                            original_create, *args, **kwargs
+                        )
+                    client_self.chat.completions.create = wrapped_create
             else:
                 # Patch sync methods for OpenAI
-                return self.trace_llm_call_sync(
-                    original_init, *args, **kwargs
-                )
-        setattr(client_class, method_name, patched_init)
+                if hasattr(client_self.chat.completions, "create"):
+                    original_create = client_self.chat.completions.create
+
+                    @functools.wraps(original_create)
+                    def wrapped_create(*args, **kwargs):
+                        return self.trace_llm_call_sync(
+                            original_create, *args, **kwargs
+                        )
+                    client_self.chat.completions.create = wrapped_create
+
+        setattr(client_class, "__init__", patched_init)
         
     def wrap_langchain_openai_method(self, client_class, method_name):
         method = method_name.split(".")[-1]
@@ -361,14 +460,14 @@ class LLMTracerMixin:
                 return self.trace_llm_call_sync(original_init, *args, **kwargs)
 
         setattr(client_class, method, patched_init)
-        
+
     def wrap_langchain_anthropic_method(self, client_class, method_name):
         original_init = getattr(client_class, method_name)
 
         @functools.wraps(original_init)
         def patched_init(*args, **kwargs):
             is_async = "AsyncChatAnthropic" in client_class.__name__
-            
+
             if is_async:
                 return self.trace_llm_call(original_init, *args, **kwargs)
             else:
@@ -436,20 +535,20 @@ class LLMTracerMixin:
             self.patches.append((obj, method_name, original_method))
 
     def create_llm_component(
-        self,
-        component_id,
-        hash_id,
-        name,
-        llm_type,
-        version,
-        memory_used,
-        start_time,
-        input_data,
-        output_data,
-        cost={},
-        usage={},
-        error=None,
-        parameters={},
+            self,
+            component_id,
+            hash_id,
+            name,
+            llm_type,
+            version,
+            memory_used,
+            start_time,
+            input_data,
+            output_data,
+            cost={},
+            usage={},
+            error=None,
+            parameters={},
     ):
         # Update total metrics
         self.total_tokens += usage.get("total_tokens", 0)
@@ -465,7 +564,7 @@ class LLMTracerMixin:
             for interaction in self.component_user_interaction.get(component_id, []):
                 if interaction["interaction_type"] in ["input", "output"]:
                     input_output_interactions.append(interaction)
-            interactions.extend(input_output_interactions) 
+            interactions.extend(input_output_interactions)
         if self.auto_instrument_file_io:
             file_io_interactions = []
             for interaction in self.component_user_interaction.get(component_id, []):
@@ -491,13 +590,24 @@ class LLMTracerMixin:
             list(parameters_to_display.items())[: self.MAX_PARAMETERS_TO_DISPLAY]
         )
 
-        # Get tags, metrics
-        # tags
+        # Set the Context and GT
+        span_gt = None
+        span_context = None
+        if name in self.span_attributes_dict:
+            span_gt = self.span_attributes_dict[name].gt
+            span_context = self.span_attributes_dict[name].context
+
+            logger.debug(f"span context {span_context}, span_gt {span_gt}")
+
+        # Tags
         tags = []
         if name in self.span_attributes_dict:
             tags = self.span_attributes_dict[name].tags or []
 
-        # metrics
+        # Get End Time
+        end_time = datetime.now().astimezone().isoformat()
+
+        # Metrics
         metrics = []
         if name in self.span_attributes_dict:
             raw_metrics = self.span_attributes_dict[name].metrics or []
@@ -506,8 +616,24 @@ class LLMTracerMixin:
                 counter = sum(1 for x in self.visited_metrics if x.startswith(base_metric_name))
                 metric_name = f'{base_metric_name}_{counter}' if counter > 0 else base_metric_name
                 self.visited_metrics.append(metric_name)
-                metric["name"] = metric_name  
+                metric["name"] = metric_name
                 metrics.append(metric)
+
+        # TODO TO check i/p and o/p is according or not
+        input = input_data["args"] if hasattr(input_data, "args") else input_data
+        output = output_data.output_response if output_data else None
+        #print("Prompt input:",input)
+        prompt = self.convert_to_content(input)
+        #print("Prompt Output: ",prompt)
+        #print("Response input: ",output)
+        response = self.convert_to_content(output)
+        #print("Response output: ",response)
+
+        # TODO: Execute & Add the User requested metrics here
+        formatted_metrics = BaseTracer.get_formatted_metric(self.span_attributes_dict, self.project_id, name, prompt, span_context, response, span_gt)
+        if formatted_metrics:
+            for formatted_metric in formatted_metrics:
+                metrics.append(formatted_metric)
 
         component = {
             "id": component_id,
@@ -515,8 +641,8 @@ class LLMTracerMixin:
             "source_hash_id": None,
             "type": "llm",
             "name": name,
-            "start_time": start_time.isoformat(),
-            "end_time": datetime.now().astimezone().isoformat(),
+            "start_time": start_time,
+            "end_time": end_time,
             "error": error,
             "parent_id": self.current_agent_id.get(),
             "info": {
@@ -530,10 +656,8 @@ class LLMTracerMixin:
             },
             "extra_info": parameters,
             "data": {
-                "input": (
-                    input_data["args"] if hasattr(input_data, "args") else input_data
-                ),
-                "output": output_data.output_response if output_data else None,
+                "input": input,
+                "output": output,
                 "memory_used": memory_used,
             },
             "metrics": metrics,
@@ -541,19 +665,79 @@ class LLMTracerMixin:
             "interactions": interactions,
         }
 
-        if name in self.span_attributes_dict:
-            span_gt = self.span_attributes_dict[name].gt
-            if span_gt is not None:
-                component["data"]["gt"] = span_gt
-            span_context = self.span_attributes_dict[name].context
-            if span_context:
-                component["data"]["context"] = span_context
+        # Assign context and gt if available
+        component["data"]["gt"] = span_gt
+        component["data"]["context"] = span_context
 
         # Reset the SpanAttributes context variable
         self.span_attributes_dict[name] = SpanAttributes(name)
 
         return component
 
+    # def convert_to_content(self, input_data):
+    #     if isinstance(input_data, dict):
+    #         messages = input_data.get("kwargs", {}).get("messages", [])
+    #     elif isinstance(input_data, list):
+    #         messages = input_data
+    #     else:
+    #         return ""
+        # return "\n".join(process_content(msg.get("content", "")) for msg in messages if msg.get("content"))
+  
+    def convert_to_content(self, input_data):
+        if isinstance(input_data, dict):
+            messages = input_data.get("kwargs", {}).get("messages", [])
+        elif isinstance(input_data, list):
+            if len(input_data)>0 and isinstance(input_data[0]['content'],ChatResponse):
+                extracted_messages = []
+
+                for item in input_data:
+                    chat_response = item.get('content')
+                    if hasattr(chat_response, 'message') and hasattr(chat_response.message, 'blocks'):
+                        for block in chat_response.message.blocks:
+                            if hasattr(block, 'text'):
+                                extracted_messages.append(block.text)
+                messages=extracted_messages
+                if isinstance(messages,list):
+                    return "\n".join(messages)
+                
+                #messages=[msg["content"] for msg in input_data if isinstance(msg, dict) and "content" in msg]
+                #messages = [msg["content"].message for msg in input_data if isinstance(msg, dict) and "content" in msg and isinstance(msg["content"], ChatResponse)]
+            else:
+                messages = input_data
+        elif isinstance(input_data,ChatResponse):
+            messages=input_data['content']
+        else:
+            return ""
+        res=""
+        # try:
+        res="\n".join(msg.get("content", "").strip() for msg in messages if msg.get("content"))
+        # except Exception as e:
+        #     print("Exception occured for: ",e)
+        #     print("Input: ",input_data,"Meeage: ",messages)
+        #     # import sys
+        #     # sys.exit()
+        return res
+
+    def process_content(content):
+        if isinstance(content, str):
+            return content.strip()
+        elif isinstance(content, list):
+            # Handle list of content blocks
+            text_parts = []
+            for block in content:
+                if hasattr(block, 'text'):
+                    # Handle TextBlock-like objects
+                    text_parts.append(block.text.strip())
+                elif isinstance(block, dict) and 'text' in block:
+                    # Handle dictionary with text field
+                    text_parts.append(block['text'].strip())
+            return " ".join(text_parts)
+        elif isinstance(content, dict):
+            # Handle dictionary content
+            return content.get('text', '').strip()
+        return ""
+
+    
     def start_component(self, component_id):
         """Start tracking network calls for a component"""
         self.component_network_calls[component_id] = []
@@ -571,7 +755,7 @@ class LLMTracerMixin:
         if not self.auto_instrument_llm:
             return await original_func(*args, **kwargs)
 
-        start_time = datetime.now().astimezone()
+        start_time = datetime.now().astimezone().isoformat()
         start_memory = psutil.Process().memory_info().rss
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash(original_func, args, kwargs)
@@ -594,7 +778,8 @@ class LLMTracerMixin:
                 if stream:
                     prompt_messages = kwargs['messages']
                     # Create response message for streaming case
-                    response_message = {"role": "assistant", "content": result} if result else {"role": "assistant", "content": ""}
+                    response_message = {"role": "assistant", "content": result} if result else {"role": "assistant",
+                                                                                                "content": ""}
                     token_usage = num_tokens_from_messages(model_name, prompt_messages, response_message)
                 else:
                     token_usage = extract_token_usage(result)
@@ -674,7 +859,7 @@ class LLMTracerMixin:
         if not self.auto_instrument_llm:
             return original_func(*args, **kwargs)
 
-        start_time = datetime.now().astimezone()
+        start_time = datetime.now().astimezone().isoformat()
         component_id = str(uuid.uuid4())
         hash_id = generate_unique_hash(original_func, args, kwargs)
 
@@ -696,13 +881,14 @@ class LLMTracerMixin:
 
             # Extract token usage and calculate cost
             model_name = extract_model_name(args, kwargs, result)
-            
+
             if 'stream' in kwargs:
                 stream = kwargs['stream']
                 if stream:
                     prompt_messages = kwargs['messages']
                     # Create response message for streaming case
-                    response_message = {"role": "assistant", "content": result} if result else {"role": "assistant", "content": ""}
+                    response_message = {"role": "assistant", "content": result} if result else {"role": "assistant",
+                                                                                                "content": ""}
                     token_usage = num_tokens_from_messages(model_name, prompt_messages, response_message)
                 else:
                     token_usage = extract_token_usage(result)
@@ -775,12 +961,12 @@ class LLMTracerMixin:
             raise
 
     def trace_llm(
-        self,
-        name: str = None,
-        tags: List[str] = [],
-        metadata: Dict[str, Any] = {},
-        metrics: List[Dict[str, Any]] = [],
-        feedback: Optional[Any] = None,
+            self,
+            name: str = None,
+            tags: List[str] = [],
+            metadata: Dict[str, Any] = {},
+            metrics: List[Dict[str, Any]] = [],
+            feedback: Optional[Any] = None,
     ):
         if name not in self.span_attributes_dict:
             self.span_attributes_dict[name] = SpanAttributes(name)
@@ -806,7 +992,7 @@ class LLMTracerMixin:
                 logger.error(f"Validation Error: {e}")
             except Exception as e:
                 logger.error(f"Error adding metric: {e}")
-                
+
         if feedback:
             self.span(name).add_feedback(feedback)
 
@@ -860,8 +1046,9 @@ class LLMTracerMixin:
 
                     if error_info:
                         llm_component["error"] = error_info["error"]
-                    
+
                     self.end_component(component_id)
+
                     # metrics
                     metrics = []
                     if name in self.span_attributes_dict:
@@ -871,7 +1058,7 @@ class LLMTracerMixin:
                             counter = sum(1 for x in self.visited_metrics if x.startswith(base_metric_name))
                             metric_name = f'{base_metric_name}_{counter}' if counter > 0 else base_metric_name
                             self.visited_metrics.append(metric_name)
-                            metric["name"] = metric_name  
+                            metric["name"] = metric_name
                             metrics.append(metric)
                     llm_component["metrics"] = metrics
                     if parent_agent_id:
@@ -935,9 +1122,9 @@ class LLMTracerMixin:
                             counter = sum(1 for x in self.visited_metrics if x.startswith(base_metric_name))
                             metric_name = f'{base_metric_name}_{counter}' if counter > 0 else base_metric_name
                             self.visited_metrics.append(metric_name)
-                            metric["name"] = metric_name  
+                            metric["name"] = metric_name
                             metrics.append(metric)
-                    llm_component["metrics"] = metrics  
+                    llm_component["metrics"] = metrics
                     if parent_agent_id:
                         children = self.agent_children.get()
                         children.append(llm_component)

@@ -2,28 +2,30 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 import uuid
 import sys
 import tempfile
 import threading
 import time
-from ....ragaai_catalyst import RagaAICatalyst
-from ..data.data_structure import (
+
+from ragaai_catalyst.tracers.agentic_tracing.upload.upload_local_metric import calculate_metric
+from ragaai_catalyst import RagaAICatalyst
+from ragaai_catalyst.tracers.agentic_tracing.data.data_structure import (
     Trace,
     Metadata,
     SystemInfo,
     Resources,
     Component,
 )
-from ..upload.upload_agentic_traces import UploadAgenticTraces
-from ..upload.upload_code import upload_code
-from ..upload.upload_trace_metric import upload_trace_metric
-from ..utils.file_name_tracker import TrackName
-from ..utils.zip_list_of_unique_files import zip_list_of_unique_files
-from ..utils.span_attributes import SpanAttributes
-from ..utils.create_dataset_schema import create_dataset_schema_with_trace
-from ..utils.system_monitor import SystemMonitor
+from ragaai_catalyst.tracers.agentic_tracing.upload.upload_agentic_traces import UploadAgenticTraces
+from ragaai_catalyst.tracers.agentic_tracing.upload.upload_code import upload_code
+from ragaai_catalyst.tracers.agentic_tracing.upload.upload_trace_metric import upload_trace_metric
+from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
+from ragaai_catalyst.tracers.agentic_tracing.utils.zip_list_of_unique_files import zip_list_of_unique_files
+from ragaai_catalyst.tracers.agentic_tracing.utils.span_attributes import SpanAttributes
+from ragaai_catalyst.tracers.agentic_tracing.utils.create_dataset_schema import create_dataset_schema_with_trace
+from ragaai_catalyst.tracers.agentic_tracing.utils.system_monitor import SystemMonitor
 
 import logging
 
@@ -181,40 +183,42 @@ class BaseTracer:
             self.trace.data[0]["end_time"] = datetime.now().astimezone().isoformat()
             self.trace.end_time = datetime.now().astimezone().isoformat()
 
-            #track memory usage
+            # track memory usage
             self.tracking = False
             self.trace.metadata.resources.memory.values = self.memory_usage_list
 
-            #track cpu usage
+            # track cpu usage
             self.trace.metadata.resources.cpu.values = self.cpu_usage_list
 
-            #track network and disk usage
+            # track network and disk usage
             network_uploads, network_downloads = 0, 0
             disk_read, disk_write = 0, 0
-            
+
             # Handle cases where lists might have different lengths
             min_len = min(len(self.network_usage_list), len(self.disk_usage_list))
             for i in range(min_len):
                 network_usage = self.network_usage_list[i]
                 disk_usage = self.disk_usage_list[i]
-                
+
                 # Safely get network usage values with defaults of 0
                 network_uploads += network_usage.get('uploads', 0) or 0
                 network_downloads += network_usage.get('downloads', 0) or 0
-                
+
                 # Safely get disk usage values with defaults of 0
                 disk_read += disk_usage.get('disk_read', 0) or 0
                 disk_write += disk_usage.get('disk_write', 0) or 0
 
-            #track disk usage
+            # track disk usage
             disk_list_len = len(self.disk_usage_list)
             self.trace.metadata.resources.disk.read = [disk_read / disk_list_len if disk_list_len > 0 else 0]
             self.trace.metadata.resources.disk.write = [disk_write / disk_list_len if disk_list_len > 0 else 0]
 
-            #track network usage
+            # track network usage
             network_list_len = len(self.network_usage_list)
-            self.trace.metadata.resources.network.uploads = [network_uploads / network_list_len if network_list_len > 0 else 0]
-            self.trace.metadata.resources.network.downloads = [network_downloads / network_list_len if network_list_len > 0 else 0]
+            self.trace.metadata.resources.network.uploads = [
+                network_uploads / network_list_len if network_list_len > 0 else 0]
+            self.trace.metadata.resources.network.downloads = [
+                network_downloads / network_list_len if network_list_len > 0 else 0]
 
             # update interval time
             self.trace.metadata.resources.cpu.interval = float(self.interval_time)
@@ -244,7 +248,7 @@ class BaseTracer:
             # Add metrics to trace before saving
             trace_data = self.trace.to_dict()
             trace_data["metrics"] = self.trace_metrics
-            
+
             # Clean up trace_data before saving
             cleaned_trace_data = self._clean_trace(trace_data)
 
@@ -454,15 +458,16 @@ class BaseTracer:
                                     else existing_span.__dict__
                                 )
                                 if (
-                                    existing_dict.get("hash_id")
-                                    == span_dict.get("hash_id")
-                                    and str(existing_dict.get("data", {}).get("input"))
-                                    == str(span_dict.get("data", {}).get("input"))
-                                    and str(existing_dict.get("data", {}).get("output"))
-                                    == str(span_dict.get("data", {}).get("output"))
+                                        existing_dict.get("hash_id")
+                                        == span_dict.get("hash_id")
+                                        and str(existing_dict.get("data", {}).get("input"))
+                                        == str(span_dict.get("data", {}).get("input"))
+                                        and str(existing_dict.get("data", {}).get("output"))
+                                        == str(span_dict.get("data", {}).get("output"))
                                 ):
                                     unique_spans[i] = span
                                     break
+                
                 else:
                     # For non-LLM spans, process their children if they exist
                     if "data" in span_dict and "children" in span_dict["data"]:
@@ -473,8 +478,44 @@ class BaseTracer:
                             span["data"]["children"] = filtered_children
                         else:
                             span.data["children"] = filtered_children
-                    unique_spans.append(span)
+                    unique_spans.append(span)                    
 
+            # Process spans to update model information for LLM spans with same name
+            llm_spans_by_name = {}
+            for i, span in enumerate(unique_spans):
+                span_dict = span if isinstance(span, dict) else span.__dict__
+                
+                if span_dict.get('type') == 'llm':
+                    span_name = span_dict.get('name')
+                    if span_name:
+                        if span_name not in llm_spans_by_name:
+                            llm_spans_by_name[span_name] = []
+                        llm_spans_by_name[span_name].append((i, span_dict))
+            
+            # Update model information for spans with same name
+            for spans_with_same_name in llm_spans_by_name.values():
+                if len(spans_with_same_name) > 1:
+                    # Check if any span has non-default model
+                    has_custom_model = any(
+                        span[1].get('info', {}).get('model') != 'default'
+                        for span in spans_with_same_name
+                    )
+                    
+                    # If we have a custom model, update all default models to 'custom'
+                    if has_custom_model:
+                        for idx, span_dict in spans_with_same_name:
+                            if span_dict.get('info', {}).get('model') == 'default':
+                                if isinstance(unique_spans[idx], dict):
+                                    if 'info' not in unique_spans[idx]:
+                                        unique_spans[idx]['info'] = {}
+                                    # unique_spans[idx]['info']['model'] = 'custom'
+                                    unique_spans[idx]['type'] = 'custom'
+                                else:
+                                    if not hasattr(unique_spans[idx], 'info'):
+                                        unique_spans[idx].info = {}
+                                    # unique_spans[idx].info['model'] = 'custom'
+                                    unique_spans[idx].type = 'custom'
+            
             return unique_spans
 
         # Remove any spans without hash ids
@@ -501,7 +542,7 @@ class BaseTracer:
             int: Next interaction ID to use
         """
         child_type = child.get("type")
-        
+
         if child_type == "tool":
             # Tool call start
             interactions.append(
@@ -614,7 +655,7 @@ class BaseTracer:
                 }
             )
             interaction_id += 1
-            
+
             interactions.append(
                 {
                     "id": str(interaction_id),
@@ -795,7 +836,7 @@ class BaseTracer:
                     }
                 )
                 interaction_id += 1
-                
+
                 interactions.append(
                     {
                         "id": str(interaction_id),
@@ -857,15 +898,83 @@ class BaseTracer:
 
         return {"workflow": sorted_interactions}
 
+    # TODO: Add support for execute metrics. Maintain list of all metrics to be added for this span
+
+    def execute_metrics(self,
+                        name: str,
+                        model: str,
+                        provider: str,
+                        prompt: str,
+                        context: str,
+                        response: str
+                        ):
+        if not hasattr(self, 'trace'):
+            logger.warning("Cannot add metrics before trace is initialized. Call start() first.")
+            return
+
+        # Convert individual parameters to metric dict if needed
+        if isinstance(name, str):
+            metrics = [{
+                "name": name
+            }]
+        else:
+            # Handle dict or list input
+            metrics = name if isinstance(name, list) else [name] if isinstance(name, dict) else []
+
+        try:
+            for metric in metrics:
+                if not isinstance(metric, dict):
+                    raise ValueError(f"Expected dict, got {type(metric)}")
+
+                if "name" not in metric :
+                    raise ValueError("Metric must contain 'name'") #score was written not required here
+
+                # Handle duplicate metric names on executing metric
+                metric_name = metric["name"]
+                if metric_name in self.visited_metrics:
+                    count = sum(1 for m in self.visited_metrics if m.startswith(metric_name))
+                    metric_name = f"{metric_name}_{count + 1}"
+                self.visited_metrics.append(metric_name)
+
+                result = calculate_metric(project_id=self.project_id,
+                                          metric_name=metric_name,
+                                          model=model,
+                                          org_domain="raga",
+                                          provider=provider,
+                                          user_id="1",  # self.user_details['id'],
+                                          prompt=prompt,
+                                          context=context,
+                                          response=response
+                                          )
+
+                result = result['data']
+                formatted_metric = {
+                    "name": metric_name,
+                    "score": result.get("score"),
+                    "reason": result.get("reason", ""),
+                    "source": "user",
+                    "cost": result.get("cost"),
+                    "latency": result.get("latency"),
+                    "mappings": [],
+                    "config": result.get("metric_config", {})
+                }
+
+                logger.debug(f"Executed metric: {formatted_metric}")
+
+        except ValueError as e:
+            logger.error(f"Validation Error: {e}")
+        except Exception as e:
+            logger.error(f"Error adding metric: {e}")
+
     def add_metrics(
-        self,
-        name: str | List[Dict[str, Any]] | Dict[str, Any] = None,
-        score: float | int = None,
-        reasoning: str = "",
-        cost: float = None,
-        latency: float = None,
-        metadata: Dict[str, Any] = None,
-        config: Dict[str, Any] = None,
+            self,
+            name: str | List[Dict[str, Any]] | Dict[str, Any] = None,
+            score: float | int = None,
+            reasoning: str = "",
+            cost: float = None,
+            latency: float = None,
+            metadata: Dict[str, Any] = None,
+            config: Dict[str, Any] = None,
     ):
         """Add metrics at the trace level.
 
@@ -909,7 +1018,7 @@ class BaseTracer:
             for metric in metrics:
                 if not isinstance(metric, dict):
                     raise ValueError(f"Expected dict, got {type(metric)}")
-                
+
                 if "name" not in metric or "score" not in metric:
                     raise ValueError("Metric must contain 'name' and 'score' fields")
 
@@ -921,7 +1030,7 @@ class BaseTracer:
                 self.visited_metrics.append(metric_name)
 
                 formatted_metric = {
-                    "name": metric_name,  
+                    "name": metric_name,
                     "score": metric["score"],
                     "reason": metric.get("reasoning", ""),
                     "source": "user",
@@ -931,7 +1040,7 @@ class BaseTracer:
                     "mappings": [],
                     "config": metric.get("config", {})
                 }
-                
+
                 self.trace_metrics.append(formatted_metric)
                 logger.debug(f"Added trace-level metric: {formatted_metric}")
 
@@ -939,8 +1048,71 @@ class BaseTracer:
             logger.error(f"Validation Error: {e}")
         except Exception as e:
             logger.error(f"Error adding metric: {e}")
-    
+
     def span(self, span_name):
         if span_name not in self.span_attributes_dict:
-            self.span_attributes_dict[span_name] = SpanAttributes(span_name)
+            self.span_attributes_dict[span_name] = SpanAttributes(span_name, self.project_id)
         return self.span_attributes_dict[span_name]
+
+    @staticmethod
+    def get_formatted_metric(span_attributes_dict, project_id, name, prompt, span_context, response, span_gt):
+        if name in span_attributes_dict:
+            local_metrics = span_attributes_dict[name].local_metrics or []
+            local_metrics_results = []
+            for metric in local_metrics:
+                try:
+                    if metric.get("prompt") is not None:
+                        prompt = metric['prompt']
+                    if metric.get("response") is not None:
+                        response = metric['response']
+                    if metric.get('context') is not None:
+                        span_context = metric['context']
+                    if metric.get('gt') is not None:
+                        span_gt = metric['gt']
+
+                    logger.info("calculating the metric, please wait....")
+                    result = calculate_metric(project_id=project_id,
+                                              metric_name=metric.get("name"),
+                                              model=metric.get("model"),
+                                              provider=metric.get("provider"),
+                                              prompt=prompt,
+                                              context=span_context,
+                                              response=response,
+                                              expected_response=span_gt
+                                              )
+
+                    result = result['data']['data'][0]
+                    config = result['metric_config']
+                    metric_config = {
+                        "job_id": config.get("job_id"),
+                        "metric_name": config.get("displayName"),
+                        "model": config.get("model"),
+                        "org_domain": config.get("orgDomain"),
+                        "provider": config.get("provider"),
+                        "reason": config.get("reason"),
+                        "request_id": config.get("request_id"),
+                        "user_id": config.get("user_id"),
+                        "threshold": {
+                            "is_editable": config.get("threshold").get("isEditable"),
+                            "lte": config.get("threshold").get("lte")
+                        }
+                    }
+                    formatted_metric = {
+                        "name": metric.get("displayName"),
+                        "displayName": metric.get("displayName"),
+                        "score": result.get("score"),
+                        "reason": result.get("reason", ""),
+                        "source": "user",
+                        "cost": result.get("cost"),
+                        "latency": result.get("latency"),
+                        "mappings": [],
+                        "config": metric_config
+                    }
+                    local_metrics_results.append(formatted_metric)
+                except ValueError as e:
+                    logger.error(f"Validation Error: {e}")
+                except Exception as e:
+                    logger.error(f"Error executing metric: {e}")
+
+            return local_metrics_results
+
