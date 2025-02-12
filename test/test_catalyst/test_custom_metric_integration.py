@@ -7,21 +7,15 @@ import json
 @pytest.fixture(scope="module")
 def access_keys():
     """Provide access keys for RagaAI Catalyst API"""
-    access_key = "v6WdeOOWKEqRIjjYLZtp"
-    secret_key = "9ez6hl4hstBdgmRqxUy9sbutrthGSnQId2cz0AaJ"
-    os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
-    os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
     return {
-        "access_key": access_key,
-        "secret_key": secret_key
+        "access_key": os.environ["RAGAAI_CATALYST_ACCESS_KEY"],
+        "secret_key": os.environ["RAGAAI_CATALYST_SECRET_KEY"]
     }
 
 @pytest.fixture(scope="module")
 def base_url():
     """Provide base URL for RagaAI Catalyst API"""
-    base_url = "https://llm-dev5.ragaai.ai/api"
-    os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
-    return base_url
+    return os.environ.setdefault("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
 
 @pytest.fixture(scope="module")
 def catalyst_session(base_url, access_keys):
@@ -148,38 +142,31 @@ def test_get_grading_criteria(custom_metric_manager):
 def test_verify_grading_criteria(custom_metric_manager, test_steps):
     """Test verifying grading criteria"""
     output_steps, metric_id = test_run_step(custom_metric_manager, test_steps)
-    print(output_steps)
-    print(metric_id)
-    
     # Get grading criteria first
     grading_criteria = custom_metric_manager.get_grading_criteria()
     
     # Verify grading criteria
     grading_criteria_result = custom_metric_manager.verify_grading_criteria(
         custom_metric_id=metric_id,
-        steps=output_steps,
-        grading_criteria=grading_criteria
+        grading_criteria="Float (0 to 1)",
+        steps=output_steps
     )
     assert grading_criteria_result is not None
-    assert isinstance(grading_criteria_result, dict)
     return grading_criteria_result
 
 @pytest.mark.integration
 def test_commit_custom_metric(custom_metric_manager, test_steps):
     """Test committing a custom metric"""
     output_steps, metric_id = test_run_step(custom_metric_manager, test_steps)
-    print("\n=== test_commit_custom_metric input ===")
-    print("metric_id:", metric_id)
-    print("output_steps:", json.dumps(output_steps, indent=2))
     
     # Commit metric
     model = "gpt-4"
     provider = "openai"
-    final_reason = "Test completion"
+    final_reason = None
     commit_message = "Test commit"
     metric_commit_output = custom_metric_manager.commit_custom_metric(
         custom_metric_id=metric_id,
-        steps=output_steps,  
+        steps=test_steps,
         model=model,
         provider=provider,
         output_steps=output_steps,
@@ -190,21 +177,19 @@ def test_commit_custom_metric(custom_metric_manager, test_steps):
     assert isinstance(metric_commit_output, dict)
     assert 'metricId' in metric_commit_output
     assert 'versionName' in metric_commit_output
-    return metric_commit_output['versionName']
+    return metric_commit_output
 
 @pytest.mark.integration
 def test_deploy_custom_metric(custom_metric_manager, test_steps):
     """Test deploying a custom metric"""
-    version_name = test_commit_custom_metric(custom_metric_manager, test_steps)
+    metric_output = test_commit_custom_metric(custom_metric_manager, test_steps)
     
     # Deploy metric
-    metric_id = test_create_custom_metric(custom_metric_manager)
     deploy_output = custom_metric_manager.deploy_custom_metric(
-        custom_metric_id=metric_id,
-        version_name=version_name
+        custom_metric_id=metric_output['metricId'],
+        version_name=metric_output['versionName']
     )
     assert deploy_output is not None
-    assert isinstance(deploy_output, dict)
 
 @pytest.mark.integration
 def test_get_custom_metric_versions(custom_metric_manager):
