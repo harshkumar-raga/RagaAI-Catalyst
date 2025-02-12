@@ -244,13 +244,11 @@ class LLMTracerMixin:
     def patch_openai_methods(self, module):
         try:
             if hasattr(module, "OpenAI"):
-                import openai
-                client_class = openai.OpenAI()
+                client_class = module.OpenAI
                 if hasattr(client_class.chat.completions, "create"):
                     self.wrap_openai_client_methods(client_class.chat.completions, "create")
             if hasattr(module, "AsyncOpenAI"):
-                import openai
-                async_client_class = openai.AsyncOpenAI()
+                async_client_class = module.AsyncOpenAI
                 if hasattr(async_client_class.chat.completions, "create"):
                     self.wrap_openai_client_methods(async_client_class.chat.completions, "create")
         except Exception as e:
@@ -417,33 +415,12 @@ class LLMTracerMixin:
 
         @functools.wraps(original_init)
         def patched_init(*args, **kwargs):
-            # Check if this is AsyncOpenAI or OpenAI
-            is_async = "AsyncOpenAI" in client_class.__name__
-            
-            if is_async:
-                # Patch async methods for AsyncOpenAI
-                if hasattr(client_self.chat.completions, "create"):
-                    original_create = client_self.chat.completions.create
-
-                    @functools.wraps(original_create)
-                    async def wrapped_create(*args, **kwargs):
-                        return await self.trace_llm_call(
-                            original_create, *args, **kwargs
-                        )
-                    client_self.chat.completions.create = wrapped_create
+            if asyncio.iscoroutinefunction(original_init):
+                return self.trace_llm_call(original_init, *args, **kwargs)
             else:
-                # Patch sync methods for OpenAI
-                if hasattr(client_self.chat.completions, "create"):
-                    original_create = client_self.chat.completions.create
+                return self.trace_llm_call_sync(original_init, *args, **kwargs)
 
-                    @functools.wraps(original_create)
-                    def wrapped_create(*args, **kwargs):
-                        return self.trace_llm_call_sync(
-                            original_create, *args, **kwargs
-                        )
-                    client_self.chat.completions.create = wrapped_create
-
-        setattr(client_class, "__init__", patched_init)
+        setattr(client_class, method_name, patched_init)
         
     def wrap_langchain_openai_method(self, client_class, method_name):
         method = method_name.split(".")[-1]
