@@ -1,6 +1,6 @@
-# Haystack Tool Call Example with RagaAI Catalyst
+# Haystack News Fetching Example with RagaAI Catalyst
 
-This example demonstrates how to implement a tool-using agent with Haystack and RagaAI Catalyst for tracing and monitoring. The agent can use tools (like web search) to answer user queries more effectively.
+This example demonstrates how to implement a news fetching agent with Haystack and RagaAI Catalyst for tracing and monitoring. The agent can use tools (like web search) to answer user queries more effectively.
 
 ## Overview
 
@@ -64,10 +64,10 @@ A custom component that maintains conversation history by collecting and storing
 
 Run the script:
 ```bash
-python tool_call.py
+python news_fetching.py
 ```
 
-The example includes a sample query about the weather in Berlin, demonstrating how the agent uses web search to provide current weather information.
+The example includes a sample query about fetching news on mars.
 
 ## Monitoring
 
