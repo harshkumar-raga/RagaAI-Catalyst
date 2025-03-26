@@ -14,7 +14,11 @@ import requests
 from bs4 import BeautifulSoup
 from huggingface_hub import HfApi
 from pypdf import PdfReader
-from smolagents import CodeAgent, HfApiModel, tool
+from smolagents import CodeAgent, LiteLLMModel, tool
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 @tool
 def get_hugging_face_top_daily_paper() -> str:
@@ -124,8 +128,10 @@ def read_pdf_file(file_path: str = "paper.pdf") -> str:
 
 def main():
     """Initialize and run the paper summarization agent."""
-    model_id = "Qwen/Qwen2.5-Coder-32B-Instruct"
-    model = HfApiModel(model_id=model_id, token='HF_API_TOKEN')
+    model = LiteLLMModel(
+        model_id="openai/gpt-4o-mini",
+        api_key=os.environ.get("OPENAI_API_KEY"),
+    )
     
     agent = CodeAgent(
         tools=[
