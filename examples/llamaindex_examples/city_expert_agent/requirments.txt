@@ -1,5 +1,0 @@
-requests
-python-dotenv
-llama-index=0.12.25
-openai
-ragaai-catalyst
