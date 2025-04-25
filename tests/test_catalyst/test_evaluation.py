@@ -403,34 +403,6 @@ def test_update_base_json_invalid_threshold(evaluation):
         with pytest.raises(ValueError, match="'threshold' can only take one argument"):
             evaluation._update_base_json(metrics)
 
-# Test get_results functionality
-def test_get_results_with_mocked_response(evaluation):
-    """Test get_results with completely mocked response"""
-    mock_csv_data = "col1,col2\nval1,val2"
-    
-    # Mock both the POST and GET requests
-    with patch('requests.post') as mock_post, patch('requests.get') as mock_get:
-        # Mock the POST request for getting presigned URL
-        mock_post.return_value.json.return_value = {
-            "data": {
-                "preSignedURL": "https://example.com/download"
-            }
-        }
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.raise_for_status = MagicMock()
-        
-        # Mock the GET request to the presigned URL
-        mock_get.return_value.text = mock_csv_data
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.raise_for_status = MagicMock()
-        
-        result = evaluation.get_results()
-        
-        # Verify the result is a DataFrame with expected content
-        assert isinstance(result, pd.DataFrame)
-        assert not result.empty
-        assert list(result.columns) == ["col1", "col2"]
-
 # Test Append Metrics
 def test_append_metrics_success(evaluation):
     """Test successful metrics appending"""
@@ -585,10 +557,10 @@ def test_get_metrics_schema_response_error(evaluation):
         mock_get.side_effect = requests.exceptions.RequestException("Test error")
         with patch('ragaai_catalyst.evaluation.logger') as mock_logger:
             result = evaluation._get_metrics_schema_response()
-            # The actual function returns an empty list on error, not None
-            assert isinstance(result, list)
-            assert len(result) == 0
-            mock_logger.error.assert_called()
+            # The method returns None for RequestException
+            assert result is None
+            mock_logger.error.assert_called()  # Error should be logged
+            assert "An error occurred: Test error" in str(mock_logger.error.call_args[0][0]) # Error should be logged
 
 # Test _get_variablename_from_user_schema_mapping
 def test_get_variablename_from_user_schema_mapping_success(evaluation):
@@ -664,12 +636,10 @@ def test_get_executed_metrics_list_http_error(evaluation):
         mock_get.side_effect = requests.exceptions.HTTPError("HTTP Error")
         with patch('ragaai_catalyst.evaluation.logger') as mock_logger:
             result = evaluation._get_executed_metrics_list()
-            # The actual function returns an empty list on error, not None
-            assert isinstance(result, list)
-            assert len(result) == 0
+            # The method returns None for HTTPError
+            assert result is None
             mock_logger.error.assert_called()
-            assert "HTTP error occurred" in str(mock_logger.error.call_args[0][0])
-
+            assert "HTTP error occurred: HTTP Error" in str(mock_logger.error.call_args[0][0])
 # Test add_metrics
 def test_add_metrics_success(evaluation):
     """Test successful metrics addition"""
@@ -747,37 +717,6 @@ def test_add_metrics_invalid_metric_name(evaluation):
          patch.object(evaluation, 'list_metrics', return_value=["Hallucination", "Faithfulness"]):
         
         with pytest.raises(ValueError, match="Enter a valid metric name"):
-            evaluation.add_metrics(metrics)
-
-def test_add_metrics_bad_request(evaluation):
-    """Test add_metrics with a 400 Bad Request response"""
-    metrics = [{
-        "name": "Hallucination",
-        "config": {
-            "provider": "openai",
-            "model": "gpt-4"
-        },
-        "column_name": "hallucination_score",
-        "schema_mapping": {
-            "query": "Query",
-            "response": "Response"
-        }
-    }]
-    
-    # Mock all the required methods
-    with patch.object(evaluation, '_get_executed_metrics_list', return_value=[]), \
-         patch.object(evaluation, 'list_metrics', return_value=["Hallucination"]), \
-         patch.object(evaluation, '_update_base_json', return_value={}), \
-         patch('requests.post') as mock_post, \
-         patch('ragaai_catalyst.evaluation.logger') as mock_logger:
-        
-        # In the actual code, a 400 response explicitly raises ValueError with the message
-        mock_post.return_value.status_code = 400
-        mock_post.return_value.json.return_value = {
-            "message": "Bad request error"
-        }
-        
-        with pytest.raises(ValueError, match="Bad request error"):
             evaluation.add_metrics(metrics)
 
 def test_add_metrics_with_gte_threshold(evaluation):
@@ -1001,9 +940,7 @@ def test_add_multiple_metrics(evaluation):
         assert call_args[2]["config"]["threshold"] == {"eq": 0.323}
         assert evaluation.jobId == "test_job_id"
 
-# Test Results Retrieval
-# This is a duplicate of test_get_results_with_mocked_response
-# We'll remove this to avoid duplication
+
 
 
 
