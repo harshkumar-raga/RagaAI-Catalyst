@@ -1,6 +1,7 @@
 import os
 import json
 import tempfile
+from turtle import pd
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 import logging
 from dataclasses import asdict
@@ -257,10 +258,15 @@ class RAGATraceExporter(SpanExporter):
             logger.error(f"Error preparing rag trace {trace_id} for upload: {str(e)}")
     
     def prepare_rag_trace(self, spans, trace_id):
-        try:            
+        try:
+            with open(os.path.join(os.getcwd(), "rag_trace_b4.json"), "w") as f:
+                json.dump(spans, f, indent=2)
             ragaai_trace, additional_metadata = rag_trace_json_converter(spans, self.custom_model_cost, trace_id, self.user_details, self.tracer_type,self.user_context)
-            ragaai_trace["metadata"]["recorded_on"] = datetime.datetime.now().astimezone().isoformat()
-            
+            # ragaai_trace["metadata"]["recorded_on"] = datetime.datetime.now().astimezone().isoformat()
+            with open(os.path.join(os.getcwd(), "rag_trace_after.json"), "w") as f:
+                json.dump(ragaai_trace, f, indent=2)
+            # import pdb; pdb.set_trace()
+
             if self.tracer_type == "langchain":
                 ragaai_trace["metadata"]["log_source"] = "langchain_tracer"
             elif self.tracer_type == "llamaindex":

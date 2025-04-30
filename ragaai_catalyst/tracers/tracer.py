@@ -192,8 +192,7 @@ class Tracer(AgenticTracing):
         #     instrumentors += [(LangChainInstrumentor, [])]
         #     self._setup_agentic_tracer(instrumentors)
         # Handle agentic tracers
-        if tracer_type == "agentic" or tracer_type.startswith("agentic/"):
-            
+        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain":
             # Setup instrumentors based on tracer type
             instrumentors = []
 
