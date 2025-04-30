@@ -178,21 +178,21 @@ class Tracer(AgenticTracing):
             logger.error(f"Failed to retrieve projects list: {e}")
             raise
 
-        if tracer_type == "langchain":
-            instrumentors = []
-            from openinference.instrumentation.langchain import LangChainInstrumentor
-            instrumentors += [(LangChainInstrumentor, [])]
-            self._setup_agentic_tracer(instrumentors)
-        elif tracer_type == "llamaindex":
-            self._upload_task = None
-            self.llamaindex_tracer = None
-        elif tracer_type == "rag/langchain":
-            instrumentors = []
-            from openinference.instrumentation.langchain import LangChainInstrumentor
-            instrumentors += [(LangChainInstrumentor, [])]
-            self._setup_agentic_tracer(instrumentors)
+        # if tracer_type == "langchain":
+        #     instrumentors = []
+        #     from openinference.instrumentation.langchain import LangChainInstrumentor
+        #     instrumentors += [(LangChainInstrumentor, [])]
+        #     self._setup_agentic_tracer(instrumentors)
+        # elif tracer_type == "llamaindex":
+        #     self._upload_task = None
+        #     self.llamaindex_tracer = None
+        # elif tracer_type == "rag/langchain":
+        #     instrumentors = []
+        #     from openinference.instrumentation.langchain import LangChainInstrumentor
+        #     instrumentors += [(LangChainInstrumentor, [])]
+        #     self._setup_agentic_tracer(instrumentors)
         # Handle agentic tracers
-        elif tracer_type == "agentic" or tracer_type.startswith("agentic/"):
+        if tracer_type == "agentic" or tracer_type.startswith("agentic/"):
             
             # Setup instrumentors based on tracer type
             instrumentors = []
@@ -308,11 +308,11 @@ class Tracer(AgenticTracing):
                     return
             
             # Handle specific framework instrumentation
-            elif tracer_type == "agentic/llamaindex":
+            elif tracer_type == "agentic/llamaindex" or tracer_type == "llamaindex":
                 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
                 instrumentors += [(LlamaIndexInstrumentor, [])] 
 
-            elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph":
+            elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph" or tracer_type == "langchain":
                 from openinference.instrumentation.langchain import LangChainInstrumentor
                 instrumentors += [(LangChainInstrumentor, [])]
             

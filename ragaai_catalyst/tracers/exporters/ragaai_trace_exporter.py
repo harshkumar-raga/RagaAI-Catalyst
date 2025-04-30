@@ -260,7 +260,11 @@ class RAGATraceExporter(SpanExporter):
         try:            
             ragaai_trace, additional_metadata = rag_trace_json_converter(spans, self.custom_model_cost, trace_id, self.user_details, self.tracer_type,self.user_context)
             ragaai_trace["metadata"]["recorded_on"] = datetime.datetime.now().astimezone().isoformat()
-            ragaai_trace["metadata"]["log_source"] = "langchain_tracer"
+            
+            if self.tracer_type == "langchain":
+                ragaai_trace["metadata"]["log_source"] = "langchain_tracer"
+            elif self.tracer_type == "llamaindex":
+                ragaai_trace["metadata"]["log_source"] = "llamaindex_tracer"
 
             if True:
                 converted_ragaai_trace = convert_langchain_callbacks_output(ragaai_trace, self.project_name, ragaai_trace["metadata"], ragaai_trace["pipeline"])
