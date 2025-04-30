@@ -3,7 +3,7 @@ from litellm import model_cost
 import logging
 import os
 import re
-import datetime
+from datetime import datetime
 import tiktoken
 
 logger = logging.getLogger("RagaAICatalyst")
@@ -13,26 +13,27 @@ logging_level = (
 
 def rag_trace_json_converter(input_trace, custom_model_cost, trace_id, user_details, tracer_type, user_context):
     trace_aggregate = {}
-
+    input_trace = add_span_hash_id(input_trace)
     prompt = get_prompt(input_trace, tracer_type)
     response = get_response(input_trace, tracer_type)
     context = get_context(input_trace, tracer_type, user_context)
-    error = get_span_errors(input_trace)
+    error = get_span_errors(input_trace, tracer_type)
     
     if tracer_type == "langchain":
         trace_aggregate["tracer_type"] = "langchain"
-    else:
+    elif tracer_type == "llamaindex":
         trace_aggregate["tracer_type"] = "llamaindex"
 
     trace_aggregate['id'] = trace_id
     trace_aggregate['trace_name'] = user_details.get("dataset_name", "")
     trace_aggregate['project_name'] = user_details.get("project_name", "")
-    trace_aggregate["start_time"] = datetime.datetime.now().astimezone().isoformat()
+    trace_aggregate["start_time"] = input_trace[0].get("start_time", "")
+    trace_aggregate["end_time"] = input_trace[-1].get("end_time", "")
     trace_aggregate["metadata"] = user_details.get("trace_user_detail", {}).get("metadata")
-    trace_aggregate["replays"] = {"source": None}
     trace_aggregate["pipeline"] = user_details.get("trace_user_detail", {}).get("pipeline")
+    trace_aggregate["replays"] = {"source": None}
 
-    trace_aggregate["data"] = [{"spans": input_trace}]
+    trace_aggregate["data"] = [{"spans": input_trace, "start_time": trace_aggregate["start_time"], "end_time": trace_aggregate["end_time"]}]
     if tracer_type == "langchain":
         additional_metadata = get_additional_metadata(input_trace, custom_model_cost, model_cost, prompt, response)
     
@@ -360,7 +361,7 @@ def get_context(input_trace, tracer_type, user_context):
         logger.error(f"Error while extracting context from trace: {str(e)}")
         return ""
 
-def get_span_errors(input_trace):
+def get_span_errors(input_trace, tracer_type):
     try:
         if tracer_type == "langchain":
             span_errors = {}
@@ -374,3 +375,29 @@ def get_span_errors(input_trace):
     except:
         logger.error(f"Error in get_span_errors")
         return None
+    
+def add_span_hash_id(input_trace):
+    """
+    Add hash IDs to spans and track name occurrences.
+    
+    Args:
+        input_trace (dict): The input trace containing spans
+        
+    Returns:
+        dict: Modified trace with hash IDs and name occurrences added to spans
+    """
+    import uuid
+    from collections import defaultdict
+        
+    name_counts = defaultdict(int)
+    
+    for span in input_trace:
+        if "name" in span:
+            # Add hash ID
+            span["hash_id"] = str(uuid.uuid4())
+            
+            # Track and update name occurrences
+            span["name_occurrences"] = name_counts[span["name"]]
+            name_counts[span["name"]] += 1
+            
+    return input_trace
