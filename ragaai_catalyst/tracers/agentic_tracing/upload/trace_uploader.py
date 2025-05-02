@@ -156,7 +156,7 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                     timeout=timeout
                 )
                 logger.info(f"Trace metrics uploaded: {response}")
-            except Exception as e:
+            except Exception as e:  
                 logger.error(f"Error uploading trace metrics: {e}")
                 # Continue with other uploads
         else:

@@ -587,8 +587,11 @@ class Tracer(AgenticTracing):
             super().start()
             return self
         elif self.tracer_type == "llamaindex":
-            self.llamaindex_tracer = LlamaIndexInstrumentationTracer(self._pass_user_data())
-            return self.llamaindex_tracer.start()
+            super().start()
+            return self
+
+            # self.llamaindex_tracer = LlamaIndexInstrumentationTracer(self._pass_user_data())
+            # return self.llamaindex_tracer.start()
         elif self.tracer_type == "rag/langchain":
             super().start()
             return self
@@ -602,35 +605,39 @@ class Tracer(AgenticTracing):
             super().stop()
             return self
         elif self.tracer_type == "llamaindex":
-            if self.llamaindex_tracer is None:
-                raise ValueError("LlamaIndex tracer was not started")
+            super().stop()
+            return self
 
-            user_detail = self._pass_user_data()
-            converted_back_to_callback = self.llamaindex_tracer.stop()
 
-            filepath_3 = os.path.join(os.getcwd(), "llama_final_result.json")
-            with open(filepath_3, 'w') as f:
-                json.dump(converted_back_to_callback, f, default=str, indent=2)
+            # if self.llamaindex_tracer is None:
+            #     raise ValueError("LlamaIndex tracer was not started")
 
-            # Apply post-processor if registered
-            if self.post_processor is not None:
-                try:
-                    final_trace_filepath = self.post_processor(filepath_3)
-                    logger.debug(f"Post-processor applied successfully, new path: {filepath_3}")
-                except Exception as e:
-                    logger.error(f"Error in post-processing: {e}")
-            else:
-                final_trace_filepath = filepath_3
+            # user_detail = self._pass_user_data()
+            # converted_back_to_callback = self.llamaindex_tracer.stop()
 
-            if converted_back_to_callback:
-                UploadTraces(json_file_path=final_trace_filepath,
-                             project_name=self.project_name,
-                             project_id=self.project_id,
-                             dataset_name=self.dataset_name,
-                             user_detail=user_detail,
-                             base_url=self.base_url
-                             ).upload_traces()
-            return 
+            # filepath_3 = os.path.join(os.getcwd(), "llama_final_result.json")
+            # with open(filepath_3, 'w') as f:
+            #     json.dump(converted_back_to_callback, f, default=str, indent=2)
+
+            # # Apply post-processor if registered
+            # if self.post_processor is not None:
+            #     try:
+            #         final_trace_filepath = self.post_processor(filepath_3)
+            #         logger.debug(f"Post-processor applied successfully, new path: {filepath_3}")
+            #     except Exception as e:
+            #         logger.error(f"Error in post-processing: {e}")
+            # else:
+            #     final_trace_filepath = filepath_3
+
+            # if converted_back_to_callback:
+            #     UploadTraces(json_file_path=final_trace_filepath,
+            #                  project_name=self.project_name,
+            #                  project_id=self.project_id,
+            #                  dataset_name=self.dataset_name,
+            #                  user_detail=user_detail,
+            #                  base_url=self.base_url
+            #                  ).upload_traces()
+            # return 
         elif self.tracer_type == "rag/langchain":
             super().stop()
         else:
@@ -638,7 +645,7 @@ class Tracer(AgenticTracing):
 
     def get_upload_status(self):
         """Check the status of the trace upload."""
-        if self.tracer_type == "langchain":
+        if self.tracer_type == "langchain" or self.tracer_type == "llamaindex":
             if self._upload_task is None:
                 return "No upload task in progress."
             if self._upload_task.done():

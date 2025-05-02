@@ -82,7 +82,8 @@ class RAGATraceExporter(SpanExporter):
     def process_complete_trace(self, spans, trace_id):
         # Convert the trace to ragaai trace format
         try:
-            if self.tracer_type == "langchain":
+            # TODO: This is bad code, should be improved
+            if self.tracer_type == "langchain" or self.tracer_type == "llamaindex": 
                 ragaai_trace_details, additional_metadata = self.prepare_rag_trace(spans, trace_id)
             else:
                 ragaai_trace_details = self.prepare_trace(spans, trace_id)
@@ -99,7 +100,7 @@ class RAGATraceExporter(SpanExporter):
         try:
             if self.post_processor!=None:
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
-            if self.tracer_type == "langchain":
+            if self.tracer_type == "langchain": # TODO: Add support for llamaindex
                 # Check if we're already in an event loop
                 try:
                     loop = asyncio.get_event_loop()
@@ -259,6 +260,8 @@ class RAGATraceExporter(SpanExporter):
     def prepare_rag_trace(self, spans, trace_id):
         try:
             ragaai_trace, additional_metadata = rag_trace_json_converter(spans, self.custom_model_cost, trace_id, self.user_details, self.tracer_type,self.user_context)
+            with open("after_rag_trace.json", 'w') as f:
+                json.dump(ragaai_trace, f, indent=2)
             if self.tracer_type == "langchain":
                 ragaai_trace["metadata"]["log_source"] = "langchain_tracer"
             elif self.tracer_type == "llamaindex":

@@ -47,181 +47,20 @@ def get_ordered_family(parent_children_mapping: Dict[str, Any]) -> List[str]:
     ordering_function(None, ordered_family)
     return reversed(ordered_family)
 
-def get_spans(input_trace, custom_model_cost):
-    span_map = {}
-    parent_children_mapping = {}
-    span_type_mapping={"AGENT":"agent","LLM":"llm","TOOL":"tool"}
-    span_name_occurrence = {}
-    for span in input_trace:
-        final_span = {}
-        span_type=span_type_mapping.get(span["attributes"]["openinference.span.kind"],"custom")
-        span_id = span["context"]["span_id"]
-        parent_id = span["parent_id"]
-        final_span["id"] = span_id
-        if span["name"] not in span_name_occurrence:
-            span_name_occurrence[span['name']]=0
-        else:
-            span_name_occurrence[span['name']]+=1
-        final_span["name"] = span["name"]+"."+str(span_name_occurrence[span['name']])
-        final_span["hash_id"] = get_uuid(final_span["name"])
-        final_span["source_hash_id"] = None
-        final_span["type"] = span_type
-        final_span["start_time"] = convert_time_format(span['start_time'])
-        final_span["end_time"] = convert_time_format(span['end_time'])
-        final_span["parent_id"] = parent_id
-        final_span["extra_info"] = None
-        '''Handle Error if any'''
-        if span["status"]["status_code"].lower() == "error":
-            final_span["error"] = span["status"]
-        else:
-            final_span["error"] = None
-        # ToDo: Find final trace format for sending error description
-        final_span["metrics"] = []
-        final_span["feedback"] = None
-        final_span["data"]={}
-        final_span["info"]={}
-        final_span["metrics"] =[]
-        final_span["extra_info"]={}
-        if span_type=="agent":
-            if "input.value" in span["attributes"]:
-                try:
-                    final_span["data"]["input"] = json.loads(span["attributes"]["input.value"])
-                except Exception as e:
-                    final_span["data"]["input"] = span["attributes"]["input.value"]
-            else:
-                final_span["data"]["input"] = ""
-            if "output.value" in span["attributes"]:
-                try:
-                    final_span["data"]["output"] = json.loads(span["attributes"]["output.value"])
-                except Exception as e:
-                    final_span["data"]["output"] = span["attributes"]["output.value"]
-            else:
-                final_span["data"]["output"] = ""
-            final_span["data"]['children'] = []
+def get_spans(input_trace):
+    data = input_trace.copy()
+    import uuid
+    from collections import defaultdict
         
-        elif span_type=="tool":
-            available_fields = list(span['attributes'].keys())
-            tool_fields = [key for key in available_fields if 'tool' in key]
-            if "input.value" in span["attributes"]:
-                try:
-                    final_span["data"]["input"] = json.loads(span["attributes"]["input.value"])
-                except Exception as e:
-                    final_span["data"]["input"] = span["attributes"]["input.value"]
-            else:
-                final_span["data"]["input"] = ""
-            if "output.value" in span["attributes"]:
-                try:
-                    final_span["data"]["output"] = json.loads(span["attributes"]["output.value"])
-                except Exception as e:
-                    final_span["data"]["output"] = span["attributes"]["output.value"]
-            else:
-                final_span["data"]["output"] = ""
-            input_data={}
-            for key in tool_fields:
-                input_data[key] = span['attributes'].get(key, None)
-            final_span["info"].update(input_data)
+    name_counts = defaultdict(int)
 
-        elif span_type=="llm":
-            available_fields = list(span['attributes'].keys())
-            input_fields = [key for key in available_fields if 'input' in key]
-            input_data = {}
-            for key in input_fields:
-                if 'mime_type' not in key:
-                    try:
-                        input_data[key] = json.loads(span['attributes'][key])
-                    except json.JSONDecodeError as e:
-                        input_data[key] = span['attributes'].get(key, None)
-            final_span["data"]["input"] = input_data
-            
-            output_fields = [key for key in available_fields if 'output' in key]
-            output_data = {}
-            output_data['content'] = {}
-            for key in output_fields:
-                if 'mime_type' not in key:
-                    try:
-                        output_data['content'][key] = json.loads(span['attributes'][key])
-                    except json.JSONDecodeError as e:
-                        output_data['content'][key] = span['attributes'].get(key, None)
-            final_span["data"]["output"] = [output_data]
+    for span in data:
+        # 1. For each span add '.{occurence_no}' to the span name, where occurence_no is the number of times the span name has occurred
+        span["name_occurrences"] = name_counts[span["name"]]
+        name_counts[span["name"]] += 1
 
-            if "llm.model_name" in span["attributes"]:
-                final_span["info"]["model"] = span["attributes"]["llm.model_name"]
-            else:
-                final_span["info"]["model"] = None
-            if "llm.invocation_parameters" in span["attributes"]:
-                try:
-                    final_span["info"].update(**json.loads(span["attributes"]["llm.invocation_parameters"]))
-                except json.JSONDecodeError as e:
-                    print(f"Error in parsing: {e}")
-                    
-                try:
-                    final_span["extra_info"]["llm_parameters"] = json.loads(span["attributes"]["llm.invocation_parameters"])
-                except json.JSONDecodeError as e:
-                    final_span["extra_info"]["llm_parameters"] = span["attributes"]["llm.invocation_parameters"]
-            else:
-                final_span["extra_info"]["llm_parameters"] = None
-
-        else:
-            if "input.value" in span["attributes"]:
-                try:
-                    final_span["data"]["input"] = json.loads(span["attributes"]["input.value"])
-                except Exception as e:
-                    final_span["data"]["input"] = span["attributes"]["input.value"]
-            if "output.value" in span["attributes"]:
-                try:
-                    final_span["data"]["output"] = json.loads(span["attributes"]["output.value"])
-                except Exception as e:
-                    final_span["data"]["output"] = span["attributes"]["output.value"]
-
-        final_span["info"]["cost"] = {}
-        final_span["info"]["tokens"] = {}
-
-        if "model" in final_span["info"]:
-            model_name = final_span["info"]["model"] 
-        
-        model_costs = {
-                "default": {"input_cost_per_token": 0.0, "output_cost_per_token": 0.0}
-            }
-        try:
-            model_costs = get_model_cost()
-        except Exception as e:
-           pass 
-       
-        if "resource" in span:
-            final_span["info"].update(span["resource"])
-        if "llm.token_count.prompt" in span['attributes']:
-            final_span["info"]["tokens"]["prompt_tokens"] = span['attributes']['llm.token_count.prompt']
-        if "llm.token_count.completion" in span['attributes']:
-            final_span["info"]["tokens"]["completion_tokens"] = span['attributes']['llm.token_count.completion']
-        if "llm.token_count.total" in span['attributes']:
-            final_span["info"]["tokens"]["total_tokens"] = span['attributes']['llm.token_count.total']
-        
-        if "info" in final_span:
-            if "tokens" in final_span["info"]:
-                if "prompt_tokens" in final_span["info"]["tokens"]:
-                    token_usage = {
-                        "prompt_tokens": final_span["info"]["tokens"]["prompt_tokens"],
-                        "completion_tokens": final_span["info"]["tokens"]["completion_tokens"],
-                        "total_tokens": final_span["info"]["tokens"]["total_tokens"]
-                    }
-                    final_span["info"]["cost"] = calculate_llm_cost(token_usage=token_usage, model_name=model_name, model_costs=model_costs, model_custom_cost=custom_model_cost) 
-        span_map[span_id] = final_span
-        if parent_id not in parent_children_mapping:
-            parent_children_mapping[parent_id] = []
-        parent_children_mapping[parent_id].append(final_span)
-    ordered_family = get_ordered_family(parent_children_mapping)
-    data = []
-    for parent_id in ordered_family:
-        children = parent_children_mapping[parent_id]
-        if parent_id in span_map:
-            parent_type = span_map[parent_id]["type"]
-            if parent_type == 'agent':
-                span_map[parent_id]['data']["children"] = children
-            else:
-                grand_parent_id = span_map[parent_id]["parent_id"]
-                parent_children_mapping[grand_parent_id].extend(children)
-        else:
-            data = children
+        # 2. For each span add span_hash_id, which is uuid4 based on the span name
+        span['span_hash_id'] = get_uuid(span['name'])
     return data
 
 def convert_json_format(input_trace, custom_model_cost):
@@ -258,36 +97,45 @@ def convert_json_format(input_trace, custom_model_cost):
     final_trace["network_calls"] = []
     final_trace["interactions"] = []
 
-    # import pdb; pdb.set_trace()
-
-    # Helper to recursively extract cost/token info from all spans
-    def accumulate_metrics(span):
-        if span["type"] == "llm" and "info" in span:
-            info = span["info"]
-            cost = info.get("cost", {})
-            tokens = info.get("tokens", {})
-
-            final_trace["metadata"]["tokens"]["prompt_tokens"] += tokens.get("prompt_tokens", 0.0)
-            final_trace["metadata"]["tokens"]["completion_tokens"] += tokens.get("completion_tokens", 0.0)
-            final_trace["metadata"]["tokens"]["total_tokens"] += tokens.get("total_tokens", 0.0)
-
-            final_trace["metadata"]["cost"]["input_cost"] += cost.get("input_cost", 0.0)
-            final_trace["metadata"]["cost"]["output_cost"] += cost.get("output_cost", 0.0)
-            final_trace["metadata"]["cost"]["total_cost"] += cost.get("total_cost", 0.0)
-
-        # Recursively process children
-        children = span.get("data", {}).get("children", [])
-        for child in children:
-            accumulate_metrics(child)
-
     # Extract and attach spans
     try:
-        spans = get_spans(input_trace, custom_model_cost)
+        spans = get_spans(input_trace)
         final_trace["data"][0]["spans"] = spans
+        
 
-        # Accumulate from root spans and their children
+        # TODO: each span has token value from prompt ,completion and total tokens. i want the sum of all these tokens for each span
+        # Calculate token counts and costs from spans
         for span in spans:
-            accumulate_metrics(span)
+            if "attributes" in span:
+                # Extract token counts
+                prompt_tokens = span["attributes"].get("llm.token_count.prompt", 0)
+                completion_tokens = span["attributes"].get("llm.token_count.completion", 0)
+                
+                # Update token counts
+                final_trace["metadata"]["tokens"]["prompt_tokens"] += prompt_tokens
+                final_trace["metadata"]["tokens"]["completion_tokens"] += completion_tokens
+                final_trace["metadata"]["tokens"]["total_tokens"] += prompt_tokens + completion_tokens
+
+                # Get model name from the last span
+                model_name = span["attributes"].get("llm.model_name", "")
+                if model_name:
+                    try:
+                        model_costs = get_model_cost()
+                        span_cost = calculate_llm_cost(
+                            {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": prompt_tokens + completion_tokens},
+                            model_name,
+                            model_costs,
+                            custom_model_cost
+                        )
+                        final_trace["metadata"]["cost"]["input_cost"] += span_cost["input_cost"]
+                        final_trace["metadata"]["cost"]["output_cost"] += span_cost["output_cost"]
+                        final_trace["metadata"]["cost"]["total_cost"] += span_cost["total_cost"]
+                        
+                        # Add cost to span attributes for debugging
+                        span["attributes"]["llm.cost"] = span_cost
+                    except Exception as e:
+                        logger.warning(f"Failed to calculate span cost: {e}")
+
     except Exception as e:
         raise Exception(f"Error in get_spans function: {e}")
 
