@@ -255,7 +255,7 @@ class RAGATraceExporter(SpanExporter):
                 # If we've exhausted all retries, log the error
                 logger.error(f"Failed to upload rag trace {trace_id} after {max_retries} attempts. Last error: {str(last_exception)}")
         except Exception as e:
-            logger.error(f"Error preparing rag trace {trace_id} for upload: {str(e)}")
+            logger.error(f"Error uploading rag trace {trace_id}: {str(e)}")
     
     def prepare_rag_trace(self, spans, trace_id):
         try:
