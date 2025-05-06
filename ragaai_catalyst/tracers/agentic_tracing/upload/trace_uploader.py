@@ -145,22 +145,22 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
             # Continue with other steps
             
         # Step 2: Upload trace metrics
-        if filepath and os.path.exists(filepath):
-            logger.info(f"Uploading trace metrics for {filepath} with base_url: {base_url} and timeout: {timeout}")
-            try:
-                response = upload_trace_metric(
-                    json_file_path=filepath,
-                    dataset_name=dataset_name,
-                    project_name=project_name,
-                    base_url=base_url,
-                    timeout=timeout
-                )
-                logger.info(f"Trace metrics uploaded: {response}")
-            except Exception as e:  
-                logger.error(f"Error uploading trace metrics: {e}")
-                # Continue with other uploads
-        else:
-            logger.warning(f"Trace file {filepath} not found, skipping metrics upload")
+        # if filepath and os.path.exists(filepath):
+        #     logger.info(f"Uploading trace metrics for {filepath} with base_url: {base_url} and timeout: {timeout}")
+        #     try:
+        #         response = upload_trace_metric(
+        #             json_file_path=filepath,
+        #             dataset_name=dataset_name,
+        #             project_name=project_name,
+        #             base_url=base_url,
+        #             timeout=timeout
+        #         )
+        #         logger.info(f"Trace metrics uploaded: {response}")
+        #     except Exception as e:  
+        #         logger.error(f"Error uploading trace metrics: {e}")
+        #         # Continue with other uploads
+        # else:
+        #     logger.warning(f"Trace file {filepath} not found, skipping metrics upload")
         
         # Step 3: Upload agentic traces
         if filepath and os.path.exists(filepath):
