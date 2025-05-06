@@ -98,6 +98,20 @@ def _fetch_presigned_url(project_name, dataset_name, base_url=None, timeout=120)
             presigned_url = update_presigned_url(presigned_url,url_base)
             return presigned_url
         else:
+            # If POST fails, try GET
+            response = requests.request("GET", 
+                                    endpoint, 
+                                    headers=headers, 
+                                    data=payload,
+                                    timeout=timeout)
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(
+                f"API Call: [GET] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
+            if response.status_code == 200:
+                presigned_url = response.json()["data"]["presignedUrls"][0]
+                presigned_url = update_presigned_url(presigned_url,url_base)
+                return presigned_url
+
             logger.error(f"Failed to fetch code hashes: {response.json()['message']}")
             raise Exception(f"Failed to fetch code hashes: {response.json()['message']}")
     except requests.exceptions.RequestException as e:
