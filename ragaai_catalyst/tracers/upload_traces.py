@@ -2,7 +2,8 @@ import requests
 import json
 import os
 from datetime import datetime
-
+import logging
+logger = logging.getLogger(__name__)
 
 class UploadTraces:
     def __init__(self, 
@@ -97,7 +98,8 @@ class UploadTraces:
             "X-Project-Name": self.project_name,
         }
 
-        response = requests.request("GET", 
+        # Changed to POST from GET
+        response = requests.request("POST", 
                                     f"{self.base_url}/v1/llm/presigned-url", 
                                     headers=headers, 
                                     data=payload,
@@ -105,6 +107,18 @@ class UploadTraces:
         if response.status_code == 200:
             presignedUrls = response.json()["data"]["presignedUrls"][0]
             return presignedUrls
+        else:
+            response = requests.request("GET", 
+                                    f"{self.base_url}/v1/llm/presigned-url", 
+                                    headers=headers, 
+                                    data=payload,
+                                    timeout=self.timeout)
+            if response.status_code == 200:
+                presignedUrls = response.json()["data"]["presignedUrls"][0]
+                return presignedUrls
+
+            logger.error(f"Failed to fetch presigned URL: {response.json()['message']}")
+            return None
 
     def _put_presigned_url(self, presignedUrl, filename):
         headers = {
