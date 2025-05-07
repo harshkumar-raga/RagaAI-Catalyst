@@ -157,11 +157,24 @@ class RAGATraceExporter(SpanExporter):
                 print(f"Error in adding tracer type: {trace_id}: {e}")
                 return None
             
+            #Add user passed metadata to the trace
+            try:
+                if self.user_details.get("trace_user_detail").get("metadata") and isinstance(self.user_details.get("trace_user_detail").get("metadata"), dict):
+                    for key, value in self.user_details.get("trace_user_detail").get("metadata").items():
+                        if key in ["log_source", "recorded_on"]:
+                            continue
+                        ragaai_trace["metadata"][key] = value
+            except Exception as e:
+                print(f"Error in adding metadata: {trace_id}: {e}")
+                return None
+            
             try:
                 # Save the trace_json 
                 trace_file_path = os.path.join(self.tmp_dir, f"{trace_id}.json")
                 with open(trace_file_path, "w") as file:
                     json.dump(ragaai_trace, file, cls=TracerJSONEncoder, indent=2)
+                with open(os.path.join(os.getcwd(), 'rag_agent_traces.json'), 'w') as f:
+                    json.dump(ragaai_trace, f, cls=TracerJSONEncoder, indent=2)
             except Exception as e:
                 print(f"Error in saving trace json: {trace_id}: {e}")
                 return None
