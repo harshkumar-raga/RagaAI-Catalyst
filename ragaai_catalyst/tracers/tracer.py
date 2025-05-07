@@ -860,19 +860,17 @@ class Tracer(AgenticTracing):
 
         Args:
             context: Additional context information to be added to the trace. Can be a string.
-
-        Raises:
-            ValueError: If tracer_type is not 'langchain' or 'llamaindex'.
         """
         if self.tracer_type not in ["langchain", "llamaindex"]:
-            raise ValueError("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
+            logger.warning("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
+            return
         
         # Convert string context to string if needed
         if isinstance(context, str):
             self.dynamic_exporter.user_context = context
             self.user_context = context
         else:
-            raise TypeError("context must be a string")
+            logger.warning("context must be a string")
     
     def add_metadata(self, metadata):
         """
@@ -880,12 +878,10 @@ class Tracer(AgenticTracing):
 
         Args:
             metadata: Additional metadata information to be added to the trace. Can be a dictionary.
-
-        Raises:
-            ValueError: If tracer_type is not 'langchain' or 'llamaindex'.
         """
         if self.tracer_type not in ["langchain", "llamaindex"]:
-            raise ValueError("add_metadata is only supported for 'langchain' and 'llamaindex' tracer types")
+            logger.warning("add_metadata is only supported for 'langchain' and 'llamaindex' tracer types")
+            return
         
         # Convert string metadata to string if needed
         user_details = self.user_details
@@ -895,8 +891,8 @@ class Tracer(AgenticTracing):
                 if key in user_metadata:
                     user_metadata[key] = value
                 else:
-                    raise ValueError(f"Key '{key}' not found in metadata")
+                    logger.warning(f"Key '{key}' not found in metadata")
             self.dynamic_exporter.user_details = user_details
             self.metadata = user_metadata
         else:
-            raise TypeError("metadata must be a dictionary")
+            logger.warning("metadata must be a dictionary")
