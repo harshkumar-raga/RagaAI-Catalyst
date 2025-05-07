@@ -86,7 +86,7 @@ class RAGATraceExporter(SpanExporter):
         except Exception as e:
             print(f"Error converting trace {trace_id}: {e}")
             return  # Exit early if conversion fails
-            
+
         # Check if trace details are None (conversion failed)
         if ragaai_trace_details is None:
             logger.error(f"Cannot upload trace {trace_id}: conversion failed and returned None")
@@ -94,7 +94,7 @@ class RAGATraceExporter(SpanExporter):
             
         # Upload the trace if upload_trace function is provided
         try:
-            if self.post_processor!=None:
+            if self.post_processor!=None and self.tracer_type != "langchain":
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
             self.upload_trace(ragaai_trace_details, trace_id)
         except Exception as e:
