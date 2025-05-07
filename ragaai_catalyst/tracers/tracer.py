@@ -142,6 +142,7 @@ class Tracer(AgenticTracing):
         self.start_time = datetime.datetime.now().astimezone().isoformat()
         self.model_cost_dict = model_cost
         self.user_context = ""  # Initialize user_context to store context from add_context
+        self.user_gt = ""  # Initialize user_gt to store gt from add_gt
         self.file_tracker = TrackName()
         self.post_processor = None
         self.max_upload_workers = max_upload_workers
@@ -817,6 +818,7 @@ class Tracer(AgenticTracing):
             post_processor= self.post_processor,
             max_upload_workers = self.max_upload_workers,
             user_context = self.user_context,
+            user_gt = self.user_gt,
             external_id=self.external_id
         )
         
@@ -871,6 +873,24 @@ class Tracer(AgenticTracing):
             self.user_context = context
         else:
             logger.warning("context must be a string")
+    
+    def add_gt(self, gt):
+        """
+        Add gt information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
+
+        Args:
+            gt: gt information to be added to the trace. Can be a string.
+        """
+        if self.tracer_type not in ["langchain", "llamaindex"]:
+            logger.warning("add_gt is only supported for 'langchain' and 'llamaindex' tracer types")
+            return
+        
+        # Convert string gt to string if needed
+        if isinstance(gt, str):
+            self.dynamic_exporter.user_gt = gt
+            self.user_gt = gt
+        else:
+            logger.warning("gt must be a string")
     
     def add_metadata(self, metadata):
         """

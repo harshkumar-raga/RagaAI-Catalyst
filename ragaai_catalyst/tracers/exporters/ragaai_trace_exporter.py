@@ -26,7 +26,7 @@ logging_level = (
 
 
 class RAGATraceExporter(SpanExporter):
-    def __init__(self, tracer_type, files_to_zip, project_name, project_id, dataset_name, user_details, base_url, custom_model_cost, timeout=120, post_processor = None, max_upload_workers = 30,user_context = None, external_id=None):
+    def __init__(self, tracer_type, files_to_zip, project_name, project_id, dataset_name, user_details, base_url, custom_model_cost, timeout=120, post_processor = None, max_upload_workers = 30,user_context = None, user_gt = None, external_id=None):
         self.trace_spans = dict()
         self.tmp_dir = tempfile.gettempdir()
         self.tracer_type = tracer_type
@@ -42,6 +42,7 @@ class RAGATraceExporter(SpanExporter):
         self.post_processor = post_processor
         self.max_upload_workers = max_upload_workers
         self.user_context = user_context
+        self.user_gt = user_gt
         self.external_id = external_id
 
     def export(self, spans):
@@ -103,7 +104,7 @@ class RAGATraceExporter(SpanExporter):
     def prepare_trace(self, spans, trace_id):
         try:
             try:
-                ragaai_trace = convert_json_format(spans, self.custom_model_cost, self.user_context)   
+                ragaai_trace = convert_json_format(spans, self.custom_model_cost, self.user_context, self.user_gt)   
             except Exception as e:
                 print(f"Error in convert_json_format function: {trace_id}: {e}")
                 return None

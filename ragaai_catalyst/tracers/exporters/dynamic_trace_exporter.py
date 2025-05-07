@@ -14,7 +14,7 @@ class DynamicTraceExporter(SpanExporter):
     certain properties to be updated dynamically during execution.
     """
     
-    def __init__(self, tracer_type, files_to_zip, project_name, project_id, dataset_name, user_details, base_url, custom_model_cost, timeout=120, post_processor = None, max_upload_workers = 30,user_context = None, external_id=None):
+    def __init__(self, tracer_type, files_to_zip, project_name, project_id, dataset_name, user_details, base_url, custom_model_cost, timeout=120, post_processor = None, max_upload_workers = 30,user_context = None, user_gt = None, external_id=None):
         """
         Initialize the DynamicTraceExporter.
         
@@ -42,6 +42,7 @@ class DynamicTraceExporter(SpanExporter):
             post_processor= post_processor,
             max_upload_workers = max_upload_workers,
             user_context = user_context,
+            user_gt = user_gt,
             external_id=external_id
         )
         
@@ -56,6 +57,7 @@ class DynamicTraceExporter(SpanExporter):
         self._post_processor = post_processor
         self._max_upload_workers = max_upload_workers
         self._user_context = user_context
+        self._user_gt = user_gt
 
     
     def export(self, spans):
@@ -115,6 +117,7 @@ class DynamicTraceExporter(SpanExporter):
         self._exporter.post_processor = self._post_processor
         self._exporter.max_upload_workers = self._max_upload_workers
         self._exporter.user_context = self._user_context
+        self._exporter.user_gt = self._user_gt    
     
     # Getter and setter methods for dynamic properties
     
@@ -190,3 +193,11 @@ class DynamicTraceExporter(SpanExporter):
     def user_context(self, value):
         self._user_context = value
 
+    @property
+    def user_gt(self):
+        return self._user_gt
+    
+    @user_gt.setter
+    def user_gt(self, value):
+        self._user_gt = value
+    

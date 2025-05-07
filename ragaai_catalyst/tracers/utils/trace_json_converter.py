@@ -63,7 +63,7 @@ def get_spans(input_trace):
         span['span_hash_id'] = get_uuid(span['name'])
     return data
 
-def convert_json_format(input_trace, custom_model_cost, user_context):
+def convert_json_format(input_trace, custom_model_cost, user_context, user_gt):
     """
     Converts a JSON from one format to UI format, handling nested spans.
 
@@ -107,6 +107,14 @@ def convert_json_format(input_trace, custom_model_cost, user_context):
         except Exception as e:
             print(f"Error in adding context: {e}")
             return None
+        
+        try:
+            if user_gt:
+                spans.append(custom_spans(user_gt, "GroundTruth"))
+        except Exception as e:
+            print(f"Error in adding ground truth: {e}")
+            return None
+
 
         final_trace["data"][0]["spans"] = spans
         
