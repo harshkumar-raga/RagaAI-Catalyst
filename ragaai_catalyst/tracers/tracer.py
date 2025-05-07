@@ -874,15 +874,12 @@ class Tracer(AgenticTracing):
     
     def add_metadata(self, metadata):
         """
-        Add metadata information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
+        Add metadata information to the trace. If metadata is a dictionary, it will be merged with existing metadata.
+        Non-dictionary metadata or keys not present in the existing metadata will be logged as warnings.
 
         Args:
-            metadata: Additional metadata information to be added to the trace. Can be a dictionary.
-        """
-        if self.tracer_type not in ["langchain", "llamaindex"]:
-            logger.warning("add_metadata is only supported for 'langchain' and 'llamaindex' tracer types")
-            return
-        
+            metadata: Additional metadata information to be added to the trace. Should be a dictionary.
+        """        
         # Convert string metadata to string if needed
         user_details = self.user_details
         user_metadata = user_details["trace_user_detail"]["metadata"]
