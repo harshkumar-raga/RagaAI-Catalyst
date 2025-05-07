@@ -103,7 +103,7 @@ class RAGATraceExporter(SpanExporter):
     def prepare_trace(self, spans, trace_id):
         try:
             try:
-                ragaai_trace = convert_json_format(spans, self.custom_model_cost)   
+                ragaai_trace = convert_json_format(spans, self.custom_model_cost, self.user_context)   
             except Exception as e:
                 print(f"Error in convert_json_format function: {trace_id}: {e}")
                 return None

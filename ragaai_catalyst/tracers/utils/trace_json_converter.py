@@ -63,7 +63,7 @@ def get_spans(input_trace):
         span['span_hash_id'] = get_uuid(span['name'])
     return data
 
-def convert_json_format(input_trace, custom_model_cost):
+def convert_json_format(input_trace, custom_model_cost, user_context):
     """
     Converts a JSON from one format to UI format, handling nested spans.
 
@@ -100,6 +100,14 @@ def convert_json_format(input_trace, custom_model_cost):
     # Extract and attach spans
     try:
         spans = get_spans(input_trace)
+        # Add user passed context to the trace
+        try:
+            if user_context:
+                spans.append(custom_spans(user_context, "Context"))
+        except Exception as e:
+            print(f"Error in adding context: {e}")
+            return None
+
         final_trace["data"][0]["spans"] = spans
         
 
@@ -145,7 +153,20 @@ def convert_json_format(input_trace, custom_model_cost):
 
     return final_trace
 
-    
+def custom_spans(text, span_type):
+    return {
+        "name": f"Custom{span_type}Span",
+        "kind": "SpanKind.INTERNAL",
+        "start_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
+        "end_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
+        "attributes": {
+            "text": text,
+            "openinference.span.kind": "UNKNOWN"
+        },
+        "name_occurrences": 0,
+        "span_hash_id": get_uuid(f"Custom{span_type}Span")
+    }
+
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python convert.py <input_openinference_trace_path> <output_trace_path>")
