@@ -25,6 +25,7 @@ def rag_trace_json_converter(input_trace, custom_model_cost, trace_id, user_deta
         trace_aggregate["tracer_type"] = "llamaindex"
 
     trace_aggregate['id'] = trace_id
+    trace_aggregate['external_id'] = ""
     trace_aggregate['trace_name'] = user_details.get("dataset_name", "")
     trace_aggregate['project_name'] = user_details.get("project_name", "")
     trace_aggregate["start_time"] = input_trace[0].get("start_time", "")
