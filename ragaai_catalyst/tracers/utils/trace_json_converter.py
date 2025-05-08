@@ -168,7 +168,7 @@ def custom_spans(text, span_type):
         "start_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
         "end_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
         "attributes": {
-            "text": text,
+            "input.value": text,
             "openinference.span.kind": "UNKNOWN"
         },
         "name_occurrences": 0,
