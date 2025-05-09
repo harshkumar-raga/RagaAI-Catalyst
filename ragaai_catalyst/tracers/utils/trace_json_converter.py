@@ -60,8 +60,8 @@ def get_spans(input_trace):
         name_counts[span["name"]] += 1
         span['name'] = f"{span['name']}.{span['name_occurrences']}"
 
-        # 2. For each span add span_hash_id, which is uuid4 based on the span name
-        span['span_hash_id'] = get_uuid(span['name'])
+        # 2. For each span add hash_id, which is uuid4 based on the span name
+        span['hash_id'] = get_uuid(span['name'])
     return data
 
 def convert_json_format(input_trace, custom_model_cost, user_context, user_gt,external_id):
@@ -174,7 +174,7 @@ def custom_spans(text, span_type):
             "openinference.span.kind": "UNKNOWN"
         },
         "name_occurrences": 0,
-        "span_hash_id": get_uuid(f"Custom{span_type}Span")
+        "hash_id": get_uuid(f"Custom{span_type}Span")
     }
 
 if __name__ == "__main__":

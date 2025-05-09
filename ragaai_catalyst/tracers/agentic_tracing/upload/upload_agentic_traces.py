@@ -169,7 +169,7 @@ class UploadAgenticTraces:
                     dataset_spans.append({
                         "spanId": span.get("context", {}).get("span_id", ""),
                         "spanName": span.get("name", ""),
-                        "spanHash": span.get("span_hash_id", ""),
+                        "spanHash": span.get("hash_id", ""),
                         "spanType": span.get("attributes", {}).get("openinference.span.kind", ""),
                     })
                 except Exception as e:
