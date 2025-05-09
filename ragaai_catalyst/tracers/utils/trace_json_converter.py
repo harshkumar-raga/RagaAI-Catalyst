@@ -64,7 +64,7 @@ def get_spans(input_trace):
         span['span_hash_id'] = get_uuid(span['name'])
     return data
 
-def convert_json_format(input_trace, custom_model_cost, user_context, user_gt):
+def convert_json_format(input_trace, custom_model_cost, user_context, user_gt,external_id):
     """
     Converts a JSON from one format to UI format, handling nested spans.
 
@@ -79,7 +79,8 @@ def convert_json_format(input_trace, custom_model_cost, user_context, user_gt):
         "trace_name": "",  
         "project_name": "",  
         "start_time": convert_time_format(min(item["start_time"] for item in input_trace)),
-        "end_time": convert_time_format(max(item["end_time"] for item in input_trace))
+        "end_time": convert_time_format(max(item["end_time"] for item in input_trace)),
+        "external_id": external_id
     }
     final_trace["metadata"] = {
         "tokens": {
