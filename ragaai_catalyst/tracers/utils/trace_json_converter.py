@@ -58,6 +58,7 @@ def get_spans(input_trace):
         # 1. For each span add '.{occurence_no}' to the span name, where occurence_no is the number of times the span name has occurred
         span["name_occurrences"] = name_counts[span["name"]]
         name_counts[span["name"]] += 1
+        span['name'] = f"{span['name']}.{span['name_occurrences']}"
 
         # 2. For each span add span_hash_id, which is uuid4 based on the span name
         span['span_hash_id'] = get_uuid(span['name'])
