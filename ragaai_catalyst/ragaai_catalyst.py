@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 import time
+import threading
 from typing import Dict, Optional, Union
 import re
 logger = logging.getLogger("RagaAICatalyst")
@@ -143,10 +144,19 @@ class RagaAICatalyst:
         """Get the API key for a specific service."""
         return self.api_keys.get(service)
 
-    @staticmethod
-    def get_token() -> Union[str, None]:
+    # Token expiration time in seconds (23 hours to be safe, as tokens typically last 24 hours)
+    # TODO: Change this to 23 hours
+    TOKEN_EXPIRATION_TIME = 6 * 60 * 60 
+    _token_expiry = None
+    _token_refresh_lock = threading.Lock()
+
+    @classmethod
+    def get_token(cls, force_refresh=False) -> Union[str, None]:
         """
-        Retrieves a token from the server using the provided access key and secret key.
+        Retrieves or refreshes a token from the server using the provided access key and secret key.
+
+        Args:
+            force_refresh (bool): If True, forces a token refresh regardless of expiration.
 
         Returns:
             - A string representing the token if successful.
@@ -158,63 +168,100 @@ class RagaAICatalyst:
             - ValueError: If there is a JSON decoding error or if authentication fails.
             - Exception: If there is an unexpected error while retrieving the token.
         """
-        access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
-        secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
+        with cls._token_refresh_lock:
+            current_token = os.getenv("RAGAAI_CATALYST_TOKEN")
+            current_time = time.time()
 
-        if not access_key or not secret_key:
-            logger.error(
-                "RAGAAI_CATALYST_ACCESS_KEY or RAGAAI_CATALYST_SECRET_KEY is not set"
-            )
-            return None
+            # Check if we need to refresh the token
+            if not force_refresh and current_token and cls._token_expiry and current_time < cls._token_expiry:
+                return current_token
 
-        headers = {"Content-Type": "application/json"}
-        json_data = {"accessKey": access_key, "secretKey": secret_key}
+            access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
+            secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
 
-        start_time = time.time()
-        endpoint = f"{RagaAICatalyst.BASE_URL}/token"
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=json_data,
-            timeout=RagaAICatalyst.TIMEOUT,
-        )
-        elapsed_ms = (time.time() - start_time) * 1000
-        logger.debug(
-            f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
-
-        # Handle specific status codes before raising an error
-        if response.status_code == 400:
-            token_response = response.json()
-            if token_response.get("message") == "Please enter valid credentials":
-                raise Exception(
-                    "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+            if not access_key or not secret_key:
+                logger.error(
+                    "RAGAAI_CATALYST_ACCESS_KEY or RAGAAI_CATALYST_SECRET_KEY is not set"
                 )
+                return None
 
-        response.raise_for_status()
+            headers = {"Content-Type": "application/json"}
+            json_data = {"accessKey": access_key, "secretKey": secret_key}
 
-        token_response = response.json()
-
-        if not token_response.get("success", False):
-            logger.error(
-                "Token retrieval was not successful: %s",
-                token_response.get("message", "Unknown error"),
+            start_time = time.time()
+            endpoint = f"{cls.BASE_URL}/token"
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                json=json_data,
+                timeout=cls.TIMEOUT,
             )
-            return None
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(
+                f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
 
-        token = token_response.get("data", {}).get("token")
+            # Handle specific status codes before raising an error
+            if response.status_code == 400:
+                token_response = response.json()
+                if token_response.get("message") == "Please enter valid credentials":
+                    raise Exception(
+                        "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+                    )
+
+            response.raise_for_status()
+
+            token_response = response.json()
+
+            if not token_response.get("success", False):
+                logger.error(
+                    "Token retrieval was not successful: %s",
+                    token_response.get("message", "Unknown error"),
+                )
+                return None
+
+            token = token_response.get("data", {}).get("token")
+            if token:
+                os.environ["RAGAAI_CATALYST_TOKEN"] = token
+                cls._token_expiry = time.time() + cls.TOKEN_EXPIRATION_TIME
+                logger.info(f"Token refreshed successfully. Next refresh in {cls.TOKEN_EXPIRATION_TIME/3600:.1f} hours")
+                return token
+            else:
+                logger.error("Token(s) not set")
+                return None
+
+    @classmethod
+    def ensure_valid_token(cls) -> Union[str, None]:
+        """
+        Ensures a valid token is available, refreshing if necessary.
+        This method should be called before making any API requests.
+
+        Returns:
+            - A string representing the valid token if successful.
+            - None if unable to obtain a valid token.
+        """
+        current_token = os.getenv("RAGAAI_CATALYST_TOKEN")
+        if not current_token or not cls._token_expiry or time.time() >= cls._token_expiry:
+            return cls.get_token(force_refresh=True)
+        return current_token
+
+    @classmethod
+    def get_auth_header(cls) -> Dict[str, str]:
+        """
+        Returns a dictionary containing the Authorization header with a valid token.
+        This method should be used instead of directly accessing os.getenv("RAGAAI_CATALYST_TOKEN").
+
+        Returns:
+            - A dictionary with the Authorization header if successful.
+            - An empty dictionary if no valid token could be obtained.
+        """
+        token = cls.ensure_valid_token()
         if token:
-            os.environ["RAGAAI_CATALYST_TOKEN"] = token
-            print("Token(s) set successfully")
-            return token
-        else:
-            logger.error("Token(s) not set")
-            return None
+            return {"Authorization": f"Bearer {token}"}
+        return {}
 
     def project_use_cases(self):
         try:
-            headers = {
-            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-            }
+            headers = self.get_auth_header()
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v2/llm/usecase"
             response = requests.get(
