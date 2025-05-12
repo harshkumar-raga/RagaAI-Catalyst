@@ -1,10 +1,13 @@
 import json
 import sys
+import uuid
 from datetime import datetime
 from typing import final, List, Dict, Any, Optional
 import pytz
 import uuid
 from ragaai_catalyst.tracers.agentic_tracing.utils.llm_utils import calculate_llm_cost, get_model_cost
+import logging
+logger = logging.getLogger(__name__)
 
 def convert_time_format(original_time_str, target_timezone_str="Asia/Kolkata"):
     """
@@ -105,14 +108,14 @@ def convert_json_format(input_trace, custom_model_cost, user_context, user_gt,ex
         # Add user passed context to the trace
         try:
             if user_context:
-                spans.append(custom_spans(user_context, "Context"))
+                spans.append(custom_spans(user_context, "Context", input_trace[0]["context"]["trace_id"], spans[0].get("parent_id")))
         except Exception as e:
             print(f"Error in adding context: {e}")
             return None
         
         try:
             if user_gt:
-                spans.append(custom_spans(user_gt, "GroundTruth"))
+                spans.append(custom_spans(user_gt, "GroundTruth", input_trace[0]["context"]["trace_id"], spans[0].get("parent_id")))
         except Exception as e:
             print(f"Error in adding ground truth: {e}")
             return None
@@ -163,16 +166,52 @@ def convert_json_format(input_trace, custom_model_cost, user_context, user_gt,ex
 
     return final_trace
 
-def custom_spans(text, span_type):
-    return {
+def custom_spans(text, span_type, trace_id, parent_id):
+    try: 
+        return {
         "name": f"Custom{span_type}Span",
+        "context": {
+            "trace_id": trace_id,
+            "span_id": f"0x{uuid.uuid4().hex[:16]}",
+            "trace_state": "[]"
+          },
         "kind": "SpanKind.INTERNAL",
+        "parent_id": parent_id,
         "start_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
         "end_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
+        "status": {
+            "status_code": "OK"
+          },
         "attributes": {
             "input.value": text,
             "openinference.span.kind": "UNKNOWN"
         },
+        "events": [],
+        "name_occurrences": 0,
+        "hash_id": get_uuid(f"Custom{span_type}Span")
+    }
+    except Exception as e:
+        logger.warning(f"Error in custom_spans function: {e}")
+        return {
+        "name": f"Custom{span_type}Span",
+        "context": {
+            "trace_id": trace_id,
+            "span_id": f"0x{uuid.uuid4().hex[:16]}",
+            "trace_state": "[]"
+          },
+        "kind": "SpanKind.INTERNAL",
+        "parent_id": parent_id,
+        "start_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
+        "end_time": convert_time_format(datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")),
+        "status": {
+            "status_code": "ERROR",
+            "description": str(e)
+          },
+        "attributes": {
+            "input.value": text,
+            "openinference.span.kind": "UNKNOWN"
+        },
+        "events": [],
         "name_occurrences": 0,
         "hash_id": get_uuid(f"Custom{span_type}Span")
     }
