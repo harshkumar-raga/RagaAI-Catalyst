@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 import time
+import threading
 from typing import Dict, Optional, Union
 import re
 logger = logging.getLogger("RagaAICatalyst")
@@ -48,6 +49,11 @@ class RagaAICatalyst:
         self.access_key, self.secret_key = self._set_access_key_secret_key(
             access_key, secret_key
         )
+
+        # Initialize token management
+        self._token_expiry = None
+        self._token_refresh_lock = threading.Lock()
+        self._refresh_thread = None
 
         RagaAICatalyst.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
@@ -143,78 +149,133 @@ class RagaAICatalyst:
         """Get the API key for a specific service."""
         return self.api_keys.get(service)
 
-    @staticmethod
-    def get_token() -> Union[str, None]:
+    # Token expiration time in seconds (6 hours by default)
+    # TODO: Change this to 23 hours
+    TOKEN_EXPIRATION_TIME = 6 * 60 * 60
+
+    def _get_credentials(self) -> tuple[str, str]:
+        """Get access key and secret key from instance or environment."""
+        access_key = self.access_key or os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
+        secret_key = self.secret_key or os.getenv("RAGAAI_CATALYST_SECRET_KEY")
+        return access_key, secret_key
+
+    def _refresh_token_async(self):
+        """Refresh token in background thread."""
+        try:
+            self.get_token(force_refresh=True)
+        except Exception as e:
+            logger.error(f"Background token refresh failed: {str(e)}")
+
+    def get_token(self, force_refresh=False) -> Union[str, None]:
         """
-        Retrieves a token from the server using the provided access key and secret key.
+        Retrieves or refreshes a token using the provided credentials.
+
+        Args:
+            force_refresh (bool): If True, forces a token refresh regardless of expiration.
 
         Returns:
             - A string representing the token if successful.
-            - None if the access key or secret key is not set or if there is an error retrieving the token.
-
-        Raises:
-            - requests.exceptions.HTTPError: If there is an HTTP error while retrieving the token.
-            - requests.exceptions.RequestException: If there is an error while retrieving the token.
-            - ValueError: If there is a JSON decoding error or if authentication fails.
-            - Exception: If there is an unexpected error while retrieving the token.
+            - None if credentials are not set or if there is an error.
         """
-        access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
-        secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
+        with self._token_refresh_lock:
+            current_token = os.getenv("RAGAAI_CATALYST_TOKEN")
+            current_time = time.time()
 
-        if not access_key or not secret_key:
-            logger.error(
-                "RAGAAI_CATALYST_ACCESS_KEY or RAGAAI_CATALYST_SECRET_KEY is not set"
+            # Check if we need to refresh the token
+            if not force_refresh and current_token and self._token_expiry and current_time < self._token_expiry:
+                return current_token
+
+            access_key, secret_key = self._get_credentials()
+            if not access_key or not secret_key:
+                logger.error("Access key or secret key is not set")
+                return None
+
+            headers = {"Content-Type": "application/json"}
+            json_data = {"accessKey": access_key, "secretKey": secret_key}
+
+            start_time = time.time()
+            endpoint = f"{self.BASE_URL}/token"
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                json=json_data,
+                timeout=self.TIMEOUT,
             )
-            return None
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(
+                f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
 
-        headers = {"Content-Type": "application/json"}
-        json_data = {"accessKey": access_key, "secretKey": secret_key}
+            # Handle specific status codes before raising an error
+            if response.status_code == 400:
+                token_response = response.json()
+                if token_response.get("message") == "Please enter valid credentials":
+                    raise Exception(
+                        "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+                    )
 
-        start_time = time.time()
-        endpoint = f"{RagaAICatalyst.BASE_URL}/token"
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=json_data,
-            timeout=RagaAICatalyst.TIMEOUT,
-        )
-        elapsed_ms = (time.time() - start_time) * 1000
-        logger.debug(
-            f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
-
-        # Handle specific status codes before raising an error
-        if response.status_code == 400:
+            response.raise_for_status()
             token_response = response.json()
-            if token_response.get("message") == "Please enter valid credentials":
-                raise Exception(
-                    "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+
+            if not token_response.get("success", False):
+                logger.error(
+                    "Token retrieval was not successful: %s",
+                    token_response.get("message", "Unknown error"),
                 )
+                return None
 
-        response.raise_for_status()
+            token = token_response.get("data", {}).get("token")
+            if token:
+                os.environ["RAGAAI_CATALYST_TOKEN"] = token
+                self._token_expiry = time.time() + self.TOKEN_EXPIRATION_TIME
+                logger.info(f"Token refreshed successfully. Next refresh in {self.TOKEN_EXPIRATION_TIME/3600:.1f} hours")
+                return token
+            else:
+                logger.error("Token(s) not set")
+                return None
 
-        token_response = response.json()
+    def ensure_valid_token(self) -> Union[str, None]:
+        """
+        Ensures a valid token is available, with different handling for missing token vs expired token:
+        - Missing token: Synchronous retrieval (fail fast)
+        - Expired token: Asynchronous refresh in background
 
-        if not token_response.get("success", False):
-            logger.error(
-                "Token retrieval was not successful: %s",
-                token_response.get("message", "Unknown error"),
-            )
-            return None
+        Returns:
+            - A string representing the valid token if successful.
+            - None if unable to obtain a valid token.
+        """
+        current_token = os.getenv("RAGAAI_CATALYST_TOKEN")
+        current_time = time.time()
 
-        token = token_response.get("data", {}).get("token")
+        # Case 1: No token - synchronous retrieval (fail fast)
+        if not current_token:
+            return self.get_token(force_refresh=True)
+
+        # Case 2: Token expired or about to expire - async refresh
+        if not self._token_expiry or current_time >= self._token_expiry:
+            if not self._refresh_thread or not self._refresh_thread.is_alive():
+                self._refresh_thread = threading.Thread(target=self._refresh_token_async)
+                self._refresh_thread.daemon = True
+                self._refresh_thread.start()
+
+        return current_token
+
+    def get_auth_header(self) -> Dict[str, str]:
+        """
+        Returns a dictionary containing the Authorization header with a valid token.
+        This method should be used instead of directly accessing os.getenv("RAGAAI_CATALYST_TOKEN").
+
+        Returns:
+            - A dictionary with the Authorization header if successful.
+            - An empty dictionary if no valid token could be obtained.
+        """
+        token = self.ensure_valid_token()
         if token:
-            os.environ["RAGAAI_CATALYST_TOKEN"] = token
-            print("Token(s) set successfully")
-            return token
-        else:
-            logger.error("Token(s) not set")
-            return None
+            return {"Authorization": f"Bearer {token}"}
+        return {}
 
     def project_use_cases(self):
         try:
-            headers = {
-            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-            }
+            headers = self.get_auth_header()
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v2/llm/usecase"
             response = requests.get(
