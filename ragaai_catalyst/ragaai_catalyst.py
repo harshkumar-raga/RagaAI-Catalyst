@@ -13,7 +13,7 @@ logging_level = (
 class RagaAICatalyst:
     BASE_URL = None
     TIMEOUT = 10  # Default timeout in seconds
-    TOKEN_EXPIRY_TIME = 6 * 60 * 60  # Default token expiration time (6 hours in seconds)
+    TOKEN_EXPIRY_TIME = 6  # Default token expiration time (6 hours in hours)
 
     def __init__(
         self,
