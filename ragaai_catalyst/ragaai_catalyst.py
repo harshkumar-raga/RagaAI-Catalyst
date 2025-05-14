@@ -13,6 +13,7 @@ logging_level = (
 class RagaAICatalyst:
     BASE_URL = None
     TIMEOUT = 10  # Default timeout in seconds
+    TOKEN_EXPIRY_TIME = 6  # Default token expiration time (6 hours in hours)
 
     def __init__(
         self,
@@ -20,6 +21,7 @@ class RagaAICatalyst:
         secret_key,
         api_keys: Optional[Dict[str, str]] = None,
         base_url: Optional[str] = None,
+        token_expiry_time: Optional[float] = 6,
     ):
         """
         Initializes a new instance of the RagaAICatalyst class.
@@ -29,6 +31,7 @@ class RagaAICatalyst:
             secret_key (str): The secret key for the RagaAICatalyst.
             api_keys (Optional[Dict[str, str]]): A dictionary of API keys for different services. Defaults to None.
             base_url (Optional[str]): The base URL for the RagaAICatalyst API. Defaults to None.
+            token_expiry_time (Optional[float]): The time in hours before the token expires. Defaults to 0.1 hours.
 
         Raises:
             ValueError: If the RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables are not set.
@@ -54,6 +57,9 @@ class RagaAICatalyst:
         self._token_expiry = None
         self._token_refresh_lock = threading.Lock()
         self._refresh_thread = None
+        
+        # Set token expiration time (convert hours to seconds)
+        RagaAICatalyst.TOKEN_EXPIRY_TIME = token_expiry_time * 60 * 60
 
         RagaAICatalyst.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
@@ -149,9 +155,8 @@ class RagaAICatalyst:
         """Get the API key for a specific service."""
         return self.api_keys.get(service)
 
-    # Token expiration time in seconds (6 hours by default)
-    # TODO: Change this to 23 hours
-    TOKEN_EXPIRATION_TIME = 6 * 60 * 60
+    # Token expiration time is now configurable via the token_expiry_time parameter
+    # Default is 6 hours, but can be changed to 23 hours or any other value
 
     def _get_credentials(self) -> tuple[str, str]:
         """Get access key and secret key from instance or environment."""
@@ -165,6 +170,29 @@ class RagaAICatalyst:
             self.get_token(force_refresh=True)
         except Exception as e:
             logger.error(f"Background token refresh failed: {str(e)}")
+            
+    def _schedule_token_refresh(self):
+        """Schedule a token refresh to happen 20 seconds before expiration."""
+        if not self._token_expiry:
+            return
+            
+        # Calculate when to refresh (20 seconds before expiration)
+        current_time = time.time()
+        refresh_buffer = min(20, RagaAICatalyst.TOKEN_EXPIRY_TIME * 0.05)  # 20 seconds or 5% of expiry time, whichever is smaller
+        time_until_refresh = max(self._token_expiry - current_time - refresh_buffer, 1)  # At least 1 second
+        
+        def delayed_refresh():
+            # Sleep until it's time to refresh
+            time.sleep(time_until_refresh)
+            logger.debug(f"Scheduled token refresh triggered")
+            self._refresh_token_async()
+            
+        # Start a new thread for the delayed refresh
+        if not self._refresh_thread or not self._refresh_thread.is_alive():
+            self._refresh_thread = threading.Thread(target=delayed_refresh)
+            self._refresh_thread.daemon = True
+            self._refresh_thread.start()
+            logger.debug(f"Token refresh scheduled in {time_until_refresh:.1f} seconds")
 
     def get_token(self, force_refresh=False) -> Union[str, None]:
         """
@@ -226,8 +254,12 @@ class RagaAICatalyst:
             token = token_response.get("data", {}).get("token")
             if token:
                 os.environ["RAGAAI_CATALYST_TOKEN"] = token
-                self._token_expiry = time.time() + self.TOKEN_EXPIRATION_TIME
-                logger.info(f"Token refreshed successfully. Next refresh in {self.TOKEN_EXPIRATION_TIME/3600:.1f} hours")
+                self._token_expiry = time.time() + RagaAICatalyst.TOKEN_EXPIRY_TIME
+                logger.debug(f"Token refreshed successfully. Next refresh in {RagaAICatalyst.TOKEN_EXPIRY_TIME/3600:.1f} hours")
+                
+                # Schedule token refresh 20 seconds before expiration
+                self._schedule_token_refresh()
+                
                 return token
             else:
                 logger.error("Token(s) not set")
@@ -237,7 +269,7 @@ class RagaAICatalyst:
         """
         Ensures a valid token is available, with different handling for missing token vs expired token:
         - Missing token: Synchronous retrieval (fail fast)
-        - Expired token: Asynchronous refresh in background
+        - Expired token: Synchronous refresh (since token is needed immediately)
 
         Returns:
             - A string representing the valid token if successful.
@@ -250,13 +282,22 @@ class RagaAICatalyst:
         if not current_token:
             return self.get_token(force_refresh=True)
 
-        # Case 2: Token expired or about to expire - async refresh
+        # Case 2: Token expired - synchronous refresh (since we need a valid token now)
         if not self._token_expiry or current_time >= self._token_expiry:
+            logger.info("Token expired, refreshing synchronously")
+            return self.get_token(force_refresh=True)
+            
+        # Case 3: Token valid but approaching expiry (less than 10% of lifetime remaining)
+        # Start background refresh but return current token
+        token_remaining_time = self._token_expiry - current_time
+        if token_remaining_time < (RagaAICatalyst.TOKEN_EXPIRY_TIME * 0.1):
             if not self._refresh_thread or not self._refresh_thread.is_alive():
+                logger.info("Token approaching expiry, starting background refresh")
                 self._refresh_thread = threading.Thread(target=self._refresh_token_async)
                 self._refresh_thread.daemon = True
                 self._refresh_thread.start()
 
+        # Return current token (which is valid)
         return current_token
 
     def get_auth_header(self) -> Dict[str, str]:
