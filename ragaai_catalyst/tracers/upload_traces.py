@@ -38,7 +38,7 @@ class UploadTraces:
             "total_cost": {"columnType": "metadata", "dataType": "numerical"},
             "total_latency": {"columnType": "metadata", "dataType": "numerical"},
             "error": {"columnType": "metadata"},
-            "external_id": {"columnType": "externalId"}
+            "externalId": {"columnType": "externalId"}
         }
 
         if additional_metadata_keys:
