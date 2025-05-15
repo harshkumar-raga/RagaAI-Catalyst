@@ -535,11 +535,18 @@ class Tracer(AgenticTracing):
             'max_upload_workers': self.max_upload_workers
         }
 
+        # Save the model_custom_cost before reinitialization
+        saved_model_custom_cost = self.model_custom_cost.copy()
+
         # Reinitialize self with new external_id and stored parameters
         self.__init__(
             external_id=external_id,
             **current_params
         )
+        
+        # Restore the model_custom_cost after reinitialization
+        self.model_custom_cost = saved_model_custom_cost
+        self.dynamic_exporter.custom_model_cost = self.model_custom_cost
 
     
 
