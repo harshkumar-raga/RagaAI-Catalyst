@@ -405,7 +405,50 @@ class Tracer(AgenticTracing):
         def recursive_mask_values(obj, parent_key=None):
             """Apply masking to all values in nested structure."""
             if isinstance(obj, dict):
-                return {k: recursive_mask_values(v, k) for k, v in obj.items()}
+                if self.tracer_type == "langchain":
+                    # Special handling for LangChain data
+                    if isinstance(obj, dict):
+                        if obj.get("name", "") == "retrieve_documents.langchain.workflow":
+                            prompt_structured_data = {
+                                "traceloop.entity.input": json.dumps({
+                                    "kwargs": {
+                                        "input": masking_func(json.loads(obj.get("attributes", {}).get("traceloop.entity.input", "")).get("kwargs", {}).get("input", "")),
+                                    }
+                                })
+                            }     
+                            prompt_data = {
+                                "name": "retrieve_documents.langchain.workflow",
+                                "attributes": prompt_structured_data,
+                            }
+                            return prompt_data
+                        elif obj.get("name", "") == "PromptTemplate.langchain.task":
+                            context_structured_data = {
+                                "traceloop.entity.input": json.dumps({
+                                    "kwargs": {
+                                        "context": masking_func(json.loads(obj.get("attributes", {}).get("traceloop.entity.input", "")).get("kwargs", {}).get("context", "")),
+                                    }
+                                }),
+                                "traceloop.entity.output": json.dumps({
+                                    "kwargs": {
+                                        "text": masking_func(json.loads(obj.get("attributes", {}).get("traceloop.entity.output", "")).get("kwargs", {}).get("text", "")),
+                                    }
+                                })
+                            }
+                            context_data = {
+                                "name": "PromptTemplate.langchain.task",
+                                "attributes": context_structured_data,
+                            }
+                            return context_data
+                        elif obj.get("name", "") == "ChatOpenAI.langchain.task":
+                            response_structured_data = {"gen_ai.completion.0.content": masking_func(obj.get("attributes", {}).get("gen_ai.completion.0.content", "")),
+                                                        "gen_ai.prompt.0.content": masking_func(obj.get("attributes", {}).get("gen_ai.prompt.0.content", ""))}
+                            response_data = {
+                                "name": "ChatOpenAI.langchain.task",
+                                "attributes" : response_structured_data
+                            }
+                            return response_data
+                else:
+                    return {k: recursive_mask_values(v, k) for k, v in obj.items()}
             elif isinstance(obj, list):
                 return [recursive_mask_values(item, parent_key) for item in obj]
             elif isinstance(obj, str):
