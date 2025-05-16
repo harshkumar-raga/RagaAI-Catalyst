@@ -142,6 +142,7 @@ class Tracer(AgenticTracing):
         self.start_time = datetime.datetime.now().astimezone().isoformat()
         self.model_cost_dict = model_cost
         self.user_context = ""  # Initialize user_context to store context from add_context
+        self.user_gt = ""  # Initialize user_gt to store gt from add_gt
         self.file_tracker = TrackName()
         self.post_processor = None
         self.max_upload_workers = max_upload_workers
@@ -178,22 +179,21 @@ class Tracer(AgenticTracing):
             logger.error(f"Failed to retrieve projects list: {e}")
             raise
 
-        if tracer_type == "langchain":
-            instrumentors = []
-            from openinference.instrumentation.langchain import LangChainInstrumentor
-            instrumentors += [(LangChainInstrumentor, [])]
-            self._setup_agentic_tracer(instrumentors)
-        elif tracer_type == "llamaindex":
-            self._upload_task = None
-            self.llamaindex_tracer = None
-        elif tracer_type == "rag/langchain":
-            instrumentors = []
-            from openinference.instrumentation.langchain import LangChainInstrumentor
-            instrumentors += [(LangChainInstrumentor, [])]
-            self._setup_agentic_tracer(instrumentors)
+        # if tracer_type == "langchain":
+        #     instrumentors = []
+        #     from openinference.instrumentation.langchain import LangChainInstrumentor
+        #     instrumentors += [(LangChainInstrumentor, [])]
+        #     self._setup_agentic_tracer(instrumentors)
+        # elif tracer_type == "llamaindex":
+        #     self._upload_task = None
+        #     self.llamaindex_tracer = None
+        # elif tracer_type == "rag/langchain":
+        #     instrumentors = []
+        #     from openinference.instrumentation.langchain import LangChainInstrumentor
+        #     instrumentors += [(LangChainInstrumentor, [])]
+        #     self._setup_agentic_tracer(instrumentors)
         # Handle agentic tracers
-        elif tracer_type == "agentic" or tracer_type.startswith("agentic/"):
-            
+        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain":
             # Setup instrumentors based on tracer type
             instrumentors = []
 
@@ -308,11 +308,11 @@ class Tracer(AgenticTracing):
                     return
             
             # Handle specific framework instrumentation
-            elif tracer_type == "agentic/llamaindex":
+            elif tracer_type == "agentic/llamaindex" or tracer_type == "llamaindex":
                 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
                 instrumentors += [(LlamaIndexInstrumentor, [])] 
 
-            elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph":
+            elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph" or tracer_type == "langchain":
                 from openinference.instrumentation.langchain import LangChainInstrumentor
                 instrumentors += [(LangChainInstrumentor, [])]
             
@@ -378,6 +378,9 @@ class Tracer(AgenticTracing):
             "input_cost_per_token": float(cost_config["input_cost_per_million_token"])/ 1000000,
             "output_cost_per_token": float(cost_config["output_cost_per_million_token"]) /1000000
         }
+        self.dynamic_exporter.custom_model_cost = self.model_custom_cost
+        logger.info(f"Updated custom model cost for {model_name}: {self.model_custom_cost[model_name]}")
+        
 
     def register_masking_function(self, masking_func):
         """
@@ -535,27 +538,8 @@ class Tracer(AgenticTracing):
             'max_upload_workers': self.max_upload_workers
         }
 
-        # Save the model_custom_cost before reinitialization
-        saved_model_custom_cost = self.model_custom_cost.copy()
-        saved_post_processor = self.post_processor
-        # Reinitialize self with new external_id and stored parameters
-        self.__init__(
-            external_id=external_id,
-            **current_params
-        )
-        
-        # Restore the model_custom_cost after reinitialization
-        self.model_custom_cost = saved_model_custom_cost
-        self.dynamic_exporter.custom_model_cost = self.model_custom_cost
-
-        # Restore post processor if it existed after reinitialization
-        self.post_processor = saved_post_processor
-        super().register_post_processor(saved_post_processor)
-        if hasattr(self, 'dynamic_exporter'):
-            self.dynamic_exporter._exporter.post_processor = saved_post_processor
-            self.dynamic_exporter._post_processor = saved_post_processor
-
-    
+        self.dynamic_exporter.external_id = external_id
+        logger.debug(f"Updated external_id to {external_id}")
 
     def set_dataset_name(self, dataset_name):
         """
@@ -653,8 +637,11 @@ class Tracer(AgenticTracing):
             super().start()
             return self
         elif self.tracer_type == "llamaindex":
-            self.llamaindex_tracer = LlamaIndexInstrumentationTracer(self._pass_user_data())
-            return self.llamaindex_tracer.start()
+            super().start()
+            return self
+
+            # self.llamaindex_tracer = LlamaIndexInstrumentationTracer(self._pass_user_data())
+            # return self.llamaindex_tracer.start()
         elif self.tracer_type == "rag/langchain":
             super().start()
             return self
@@ -668,35 +655,39 @@ class Tracer(AgenticTracing):
             super().stop()
             return self
         elif self.tracer_type == "llamaindex":
-            if self.llamaindex_tracer is None:
-                raise ValueError("LlamaIndex tracer was not started")
+            super().stop()
+            return self
 
-            user_detail = self._pass_user_data()
-            converted_back_to_callback = self.llamaindex_tracer.stop()
 
-            filepath_3 = os.path.join(os.getcwd(), "llama_final_result.json")
-            with open(filepath_3, 'w') as f:
-                json.dump(converted_back_to_callback, f, default=str, indent=2)
+            # if self.llamaindex_tracer is None:
+            #     raise ValueError("LlamaIndex tracer was not started")
 
-            # Apply post-processor if registered
-            if self.post_processor is not None:
-                try:
-                    final_trace_filepath = self.post_processor(filepath_3)
-                    logger.debug(f"Post-processor applied successfully, new path: {filepath_3}")
-                except Exception as e:
-                    logger.error(f"Error in post-processing: {e}")
-            else:
-                final_trace_filepath = filepath_3
+            # user_detail = self._pass_user_data()
+            # converted_back_to_callback = self.llamaindex_tracer.stop()
 
-            if converted_back_to_callback:
-                UploadTraces(json_file_path=final_trace_filepath,
-                             project_name=self.project_name,
-                             project_id=self.project_id,
-                             dataset_name=self.dataset_name,
-                             user_detail=user_detail,
-                             base_url=self.base_url
-                             ).upload_traces()
-            return 
+            # filepath_3 = os.path.join(os.getcwd(), "llama_final_result.json")
+            # with open(filepath_3, 'w') as f:
+            #     json.dump(converted_back_to_callback, f, default=str, indent=2)
+
+            # # Apply post-processor if registered
+            # if self.post_processor is not None:
+            #     try:
+            #         final_trace_filepath = self.post_processor(filepath_3)
+            #         logger.debug(f"Post-processor applied successfully, new path: {filepath_3}")
+            #     except Exception as e:
+            #         logger.error(f"Error in post-processing: {e}")
+            # else:
+            #     final_trace_filepath = filepath_3
+
+            # if converted_back_to_callback:
+            #     UploadTraces(json_file_path=final_trace_filepath,
+            #                  project_name=self.project_name,
+            #                  project_id=self.project_id,
+            #                  dataset_name=self.dataset_name,
+            #                  user_detail=user_detail,
+            #                  base_url=self.base_url
+            #                  ).upload_traces()
+            # return 
         elif self.tracer_type == "rag/langchain":
             super().stop()
         else:
@@ -704,7 +695,7 @@ class Tracer(AgenticTracing):
 
     def get_upload_status(self):
         """Check the status of the trace upload."""
-        if self.tracer_type == "langchain":
+        if self.tracer_type == "langchain" or self.tracer_type == "llamaindex":
             if self._upload_task is None:
                 return "No upload task in progress."
             if self._upload_task.done():
@@ -868,6 +859,7 @@ class Tracer(AgenticTracing):
             post_processor= self.post_processor,
             max_upload_workers = self.max_upload_workers,
             user_context = self.user_context,
+            user_gt = self.user_gt,
             external_id=self.external_id
         )
         
@@ -911,33 +903,44 @@ class Tracer(AgenticTracing):
 
         Args:
             context: Additional context information to be added to the trace. Can be a string.
-
-        Raises:
-            ValueError: If tracer_type is not 'langchain' or 'llamaindex'.
         """
         if self.tracer_type not in ["langchain", "llamaindex"]:
-            raise ValueError("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
+            logger.warning("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
+            return
         
         # Convert string context to string if needed
         if isinstance(context, str):
             self.dynamic_exporter.user_context = context
             self.user_context = context
         else:
-            raise TypeError("context must be a string")
+            logger.warning("context must be a string")
+    
+    def add_gt(self, gt):
+        """
+        Add gt information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
+
+        Args:
+            gt: gt information to be added to the trace. Can be a string.
+        """
+        if self.tracer_type not in ["langchain", "llamaindex"]:
+            logger.warning("add_gt is only supported for 'langchain' and 'llamaindex' tracer types")
+            return
+        
+        # Convert string gt to string if needed
+        if isinstance(gt, str):
+            self.dynamic_exporter.user_gt = gt
+            self.user_gt = gt
+        else:
+            logger.warning("gt must be a string")
     
     def add_metadata(self, metadata):
         """
-        Add metadata information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
+        Add metadata information to the trace. If metadata is a dictionary, it will be merged with existing metadata.
+        Non-dictionary metadata or keys not present in the existing metadata will be logged as warnings.
 
         Args:
-            metadata: Additional metadata information to be added to the trace. Can be a dictionary.
-
-        Raises:
-            ValueError: If tracer_type is not 'langchain' or 'llamaindex'.
-        """
-        if self.tracer_type not in ["langchain", "llamaindex"]:
-            raise ValueError("add_metadata is only supported for 'langchain' and 'llamaindex' tracer types")
-        
+            metadata: Additional metadata information to be added to the trace. Should be a dictionary.
+        """        
         # Convert string metadata to string if needed
         user_details = self.user_details
         user_metadata = user_details["trace_user_detail"]["metadata"]
@@ -946,8 +949,8 @@ class Tracer(AgenticTracing):
                 if key in user_metadata:
                     user_metadata[key] = value
                 else:
-                    raise ValueError(f"Key '{key}' not found in metadata")
+                    logger.warning(f"Key '{key}' not found in metadata")
             self.dynamic_exporter.user_details = user_details
             self.metadata = user_metadata
         else:
-            raise TypeError("metadata must be a dictionary")
+            logger.warning("metadata must be a dictionary")
