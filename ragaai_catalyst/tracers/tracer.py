@@ -404,23 +404,27 @@ class Tracer(AgenticTracing):
 
         def recursive_mask_values(obj, parent_key=None):
             """Apply masking to all values in nested structure."""
-            if isinstance(obj, dict):
-                return {k: recursive_mask_values(v, k) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [recursive_mask_values(item, parent_key) for item in obj]
-            elif isinstance(obj, str):
-                # List of keys that should NOT be masked
-                excluded_keys = {
-                    'start_time', 'end_time', 'name', 'id', 
-                    'hash_id', 'parent_id', 'source_hash_id',
-                    'cost', 'type', 'feedback', 'error', 'ctx','telemetry.sdk.version',
-                    'telemetry.sdk.language','service.name'
-                }
-                # Apply masking only if the key is NOT in the excluded list
-                if parent_key and parent_key.lower() not in excluded_keys:
-                    return masking_func(obj)
-                return obj
-            else:
+            try:
+                if isinstance(obj, dict):
+                    return {k: recursive_mask_values(v, k) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [recursive_mask_values(item, parent_key) for item in obj]
+                elif isinstance(obj, str):
+                    # List of keys that should NOT be masked
+                    excluded_keys = {
+                        'start_time', 'end_time', 'name', 'id', 
+                        'hash_id', 'parent_id', 'source_hash_id',
+                        'cost', 'type', 'feedback', 'error', 'ctx','telemetry.sdk.version',
+                        'telemetry.sdk.language','service.name'
+                    }
+                    # Apply masking only if the key is NOT in the excluded list
+                    if parent_key and parent_key.lower() not in excluded_keys:
+                        return masking_func(obj)
+                    return obj
+                else:
+                    return obj
+            except Exception as e:
+                logger.error(f"Error masking value: {e}")
                 return obj
 
         def file_post_processor(original_trace_json_path: os.PathLike) -> os.PathLike:
