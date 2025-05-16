@@ -95,7 +95,7 @@ class RAGATraceExporter(SpanExporter):
             
         # Upload the trace if upload_trace function is provided
         try:
-            if self.post_processor!=None and self.tracer_type != "langchain":
+            if self.post_processor!=None:
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
             self.upload_trace(ragaai_trace_details, trace_id)
         except Exception as e:
