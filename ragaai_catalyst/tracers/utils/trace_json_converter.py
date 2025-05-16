@@ -1,12 +1,17 @@
 import json
+import logging
 import sys
 import uuid
 from datetime import datetime
-from typing import final, List, Dict, Any, Optional
+from typing import Any, Dict, List
+
 import pytz
-import uuid
-from ragaai_catalyst.tracers.agentic_tracing.utils.llm_utils import calculate_llm_cost, get_model_cost
-import logging
+
+from ragaai_catalyst.tracers.agentic_tracing.utils.llm_utils import (
+    calculate_llm_cost,
+    get_model_cost,
+)
+
 logger = logging.getLogger(__name__)
 
 def convert_time_format(original_time_str, target_timezone_str="Asia/Kolkata"):
@@ -52,7 +57,6 @@ def get_ordered_family(parent_children_mapping: Dict[str, Any]) -> List[str]:
 
 def get_spans(input_trace):
     data = input_trace.copy()
-    import uuid
     from collections import defaultdict
         
     name_counts = defaultdict(int)

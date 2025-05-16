@@ -1,23 +1,23 @@
-import os
 import json
+import logging
+import os
 import tempfile
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-import logging
 from dataclasses import asdict
-from ragaai_catalyst.tracers.utils.trace_json_converter import convert_json_format
+
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+
 from ragaai_catalyst.tracers.agentic_tracing.tracers.base import TracerJSONEncoder
+from ragaai_catalyst.tracers.agentic_tracing.upload.trace_uploader import (
+    submit_upload_task,
+)
 from ragaai_catalyst.tracers.agentic_tracing.utils.system_monitor import SystemMonitor
-from ragaai_catalyst.tracers.agentic_tracing.upload.trace_uploader import submit_upload_task
-from ragaai_catalyst.tracers.agentic_tracing.utils.zip_list_of_unique_files import zip_list_of_unique_files
-from ragaai_catalyst.tracers.agentic_tracing.utils.trace_utils import format_interactions
-from ragaai_catalyst.tracers.utils.rag_trace_json_converter import rag_trace_json_converter
-from ragaai_catalyst.tracers.utils.convert_langchain_callbacks_output import convert_langchain_callbacks_output
-from ragaai_catalyst.tracers.upload_traces import UploadTraces
-import datetime
-import logging
-import asyncio
-import concurrent.futures
-from functools import partial
+from ragaai_catalyst.tracers.agentic_tracing.utils.trace_utils import (
+    format_interactions,
+)
+from ragaai_catalyst.tracers.agentic_tracing.utils.zip_list_of_unique_files import (
+    zip_list_of_unique_files,
+)
+from ragaai_catalyst.tracers.utils.trace_json_converter import convert_json_format
 
 logger = logging.getLogger("RagaAICatalyst")
 logging_level = (
