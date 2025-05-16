@@ -58,6 +58,7 @@ class DynamicTraceExporter(SpanExporter):
         self._max_upload_workers = max_upload_workers
         self._user_context = user_context
         self._user_gt = user_gt
+        self._external_id = external_id
 
     
     def export(self, spans):
@@ -118,6 +119,7 @@ class DynamicTraceExporter(SpanExporter):
         self._exporter.max_upload_workers = self._max_upload_workers
         self._exporter.user_context = self._user_context
         self._exporter.user_gt = self._user_gt    
+        self._exporter.external_id = self._external_id
     
     # Getter and setter methods for dynamic properties
     
@@ -200,4 +202,12 @@ class DynamicTraceExporter(SpanExporter):
     @user_gt.setter
     def user_gt(self, value):
         self._user_gt = value
+
+    @property
+    def external_id(self):
+        return self._external_id
+    
+    @external_id.setter
+    def external_id(self, value):
+        self._external_id = value
     

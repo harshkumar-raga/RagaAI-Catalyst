@@ -378,6 +378,9 @@ class Tracer(AgenticTracing):
             "input_cost_per_token": float(cost_config["input_cost_per_million_token"])/ 1000000,
             "output_cost_per_token": float(cost_config["output_cost_per_million_token"]) /1000000
         }
+        self.dynamic_exporter.custom_model_cost = self.model_custom_cost
+        logger.info(f"Updated custom model cost for {model_name}: {self.model_custom_cost[model_name]}")
+        
 
     def register_masking_function(self, masking_func):
         """
@@ -492,13 +495,8 @@ class Tracer(AgenticTracing):
             'max_upload_workers': self.max_upload_workers
         }
 
-        # Reinitialize self with new external_id and stored parameters
-        self.__init__(
-            external_id=external_id,
-            **current_params
-        )
-
-    
+        self.dynamic_exporter.external_id = external_id
+        logger.debug(f"Updated external_id to {external_id}")
 
     def set_dataset_name(self, dataset_name):
         """
