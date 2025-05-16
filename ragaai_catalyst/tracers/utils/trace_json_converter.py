@@ -9,6 +9,7 @@ import pytz
 
 from ragaai_catalyst.tracers.agentic_tracing.utils.llm_utils import (
     calculate_llm_cost,
+    count_tokens,
     get_model_cost,
 )
 
@@ -127,15 +128,28 @@ def convert_json_format(input_trace, custom_model_cost, user_context, user_gt,ex
 
         final_trace["data"][0]["spans"] = spans
         
-
-        # TODO: each span has token value from prompt ,completion and total tokens. i want the sum of all these tokens for each span
         # Calculate token counts and costs from spans
         for span in spans:
             if "attributes" in span:
                 # Extract token counts
                 prompt_tokens = span["attributes"].get("llm.token_count.prompt", 0)
                 completion_tokens = span["attributes"].get("llm.token_count.completion", 0)
-                
+
+                # If prompt tokens or/and completion tokens are not present, will calculate it using tiktoken
+                try:
+                    if prompt_tokens == 0:
+                        prompt_value = span["attributes"].get("input.value")
+                        if prompt_value:
+                            prompt_tokens = count_tokens(prompt_value)
+                            logger.debug(f"Prompt tokens not present, calculated it: {prompt_tokens}")
+                    if completion_tokens == 0:
+                        completion_value = span["attributes"].get("output.value")
+                        if completion_value:
+                            completion_tokens = count_tokens(completion_value)
+                            logger.debug(f"Completion tokens not present, calculated it: {completion_tokens}")
+                except Exception as e:
+                    logger.warning(f"Failed to calculate token counts: {e}")
+
                 # Update token counts
                 final_trace["metadata"]["tokens"]["prompt_tokens"] += prompt_tokens
                 final_trace["metadata"]["tokens"]["completion_tokens"] += completion_tokens
