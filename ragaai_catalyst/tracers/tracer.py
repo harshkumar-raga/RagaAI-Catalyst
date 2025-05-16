@@ -537,7 +537,7 @@ class Tracer(AgenticTracing):
 
         # Save the model_custom_cost before reinitialization
         saved_model_custom_cost = self.model_custom_cost.copy()
-
+        saved_post_processor = self.post_processor
         # Reinitialize self with new external_id and stored parameters
         self.__init__(
             external_id=external_id,
@@ -547,6 +547,13 @@ class Tracer(AgenticTracing):
         # Restore the model_custom_cost after reinitialization
         self.model_custom_cost = saved_model_custom_cost
         self.dynamic_exporter.custom_model_cost = self.model_custom_cost
+
+        # Restore post processor if it existed after reinitialization
+        self.post_processor = saved_post_processor
+        super().register_post_processor(saved_post_processor)
+        if hasattr(self, 'dynamic_exporter'):
+            self.dynamic_exporter._exporter.post_processor = saved_post_processor
+            self.dynamic_exporter._post_processor = saved_post_processor
 
     
 
