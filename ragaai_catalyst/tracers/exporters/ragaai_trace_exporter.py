@@ -100,21 +100,27 @@ class RAGATraceExporter(SpanExporter):
             if self.post_processor!=None and self.tracer_type != "langchain":
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
             if self.tracer_type == "langchain":
-                # Check if we're already in an event loop
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # We're in a running event loop (like in Colab/Jupyter)
-                        # Create a future and run the coroutine
-                        future = asyncio.ensure_future(self.upload_rag_trace(ragaai_trace_details, additional_metadata, trace_id, self.post_processor))
-                        # We don't wait for it to complete as this would block the event loop
-                        logger.info(f"Scheduled async upload for trace {trace_id} in existing event loop")
-                    else:
-                        # No running event loop, use asyncio.run()
-                        asyncio.run(self.upload_rag_trace(ragaai_trace_details, additional_metadata, trace_id, self.post_processor))
-                except RuntimeError:
-                    # No event loop exists, create one
-                    asyncio.run(self.upload_rag_trace(ragaai_trace_details, additional_metadata, trace_id, self.post_processor))
+                import threading
+                
+                def upload_in_thread():
+                    try:
+                        thread_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(thread_loop)
+                        try:
+                            thread_loop.run_until_complete(
+                                self.upload_rag_trace(ragaai_trace_details, additional_metadata, trace_id, self.post_processor)
+                            )
+                            logger.info(f"Successfully completed upload for trace {trace_id} in dedicated thread")
+                        finally:
+                            thread_loop.close()
+                    except Exception as e:
+                        logger.error(f"Error in upload thread for trace {trace_id}: {str(e)}")
+                
+                upload_thread = threading.Thread(target=upload_in_thread)
+                upload_thread.daemon = True
+                upload_thread.start()
+                logger.info(f"Started dedicated upload thread for trace {trace_id}")
+                
             else:
                 self.upload_trace(ragaai_trace_details, trace_id)
         except Exception as e: 
