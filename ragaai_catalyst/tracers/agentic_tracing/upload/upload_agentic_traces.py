@@ -78,6 +78,7 @@ class UploadAgenticTraces:
                 elif response.status_code == 401:
                     logger.warning("Received 401 error. Attempting to refresh token.")
                     RagaAICatalyst.get_token(force_refresh=True)
+                    time.sleep(0.5)
                     headers = {
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
@@ -189,6 +190,7 @@ class UploadAgenticTraces:
             elif response.status_code == 401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
                 RagaAICatalyst.get_token(force_refresh=True)
+                time.sleep(0.5)
                 headers = {
                     "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
                     "Content-Type": "application/json",
@@ -207,6 +209,9 @@ class UploadAgenticTraces:
                 )
                 if response.status_code != 200:
                     print(f"Error inserting traces: {response.json()['message']}")
+                    return None
+                else:
+                    print("Error while inserting traces")
                     return None
         except requests.exceptions.RequestException as e:
             print(f"Error while inserting traces: {e}")
