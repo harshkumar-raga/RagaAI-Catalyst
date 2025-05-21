@@ -77,11 +77,10 @@ class UploadAgenticTraces:
                     return presignedurl
                 elif response.status_code == 401:
                     logger.warning("Received 401 error. Attempting to refresh token.")
-                    RagaAICatalyst.get_token(force_refresh=True)
-                    time.sleep(0.5)
+                    token = RagaAICatalyst.get_token(force_refresh=True)
                     headers = {
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                        "Authorization": f"Bearer {token}",
                         "X-Project-Name": self.project_name,
                     }
                     response = requests.request(
@@ -189,10 +188,9 @@ class UploadAgenticTraces:
                 return None
             elif response.status_code == 401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
-                RagaAICatalyst.get_token(force_refresh=True)
-                time.sleep(0.5)
+                token = RagaAICatalyst.get_token(force_refresh=True)
                 headers = {
-                    "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                    "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json",
                     "X-Project-Name": self.project_name,
                 }

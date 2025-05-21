@@ -236,11 +236,11 @@ def _insert_code(
 
         elif response.status_code == 401:
             logger.warning("Received 401 error. Attempting to refresh token.")
-            RagaAICatalyst.get_token(force_refresh=True)
+            token = RagaAICatalyst.get_token(force_refresh=True)
             headers = {
                 "X-Project-Name": project_name,
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "Authorization": f"Bearer {token}",
             }
             response = requests.request(
                 "POST", endpoint, headers=headers, data=payload, timeout=timeout
