@@ -60,7 +60,7 @@ class RagaExporter:
         self.secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
         self.max_urls = 20
         if not self.access_key or not self.secret_key:
-            raise ValueError(
+            logger.error(
                 "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
             )
         if not os.getenv("RAGAAI_CATALYST_TOKEN"):
@@ -68,7 +68,7 @@ class RagaExporter:
 
         create_status_code = self._create_schema()
         if create_status_code != 200:
-            raise Exception(
+            logger.error(
                 "Failed to create schema. Please consider raising an issue."
             )
         # elif status_code != 200:
