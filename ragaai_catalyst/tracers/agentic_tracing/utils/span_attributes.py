@@ -79,10 +79,12 @@ class SpanAttributes:
 
         for metric in metrics:
             if not isinstance(metric, dict):
-                raise ValueError(f"Expected dict, got {type(metric)}")
+                logger.error(f"Expected dict, got {type(metric)}")
+                continue
 
             if "name" not in metric:
-                raise ValueError("Metric must contain 'name'")
+                logger.error("Metric must contain 'name'")
+                continue
 
             metric_name = metric["name"]
             if metric_name in self.local_metrics:
@@ -111,7 +113,8 @@ class SpanAttributes:
 
     def add_gt(self, gt: Any):
         if not isinstance(gt, (str, int, float, bool, list, dict)):
-            raise TypeError(f"Unsupported type for gt: {type(gt)}")
+            logger.error(f"Unsupported type for gt: {type(gt)}")
+            return
         if self.gt:
             logger.warning(f"GT already exists: {self.gt} \n Overwriting...")
         self.gt = gt
