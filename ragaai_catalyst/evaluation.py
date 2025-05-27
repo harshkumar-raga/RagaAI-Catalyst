@@ -46,6 +46,7 @@ class Evaluation:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve projects list: {e}")
+            pass
 
         try:
 
@@ -73,7 +74,7 @@ class Evaluation:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve dataset list: {e}")
-
+            pass
     
     def list_metrics(self):
         headers = {
@@ -124,7 +125,7 @@ class Evaluation:
                 return dataset["derivedDatasetId"]
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve dataset list: {e}")
-
+            pass
 
     def _get_dataset_schema(self, metric_to_evaluate=None):
         #this dataset_id is based on which type of metric_to_evaluate  
