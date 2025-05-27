@@ -297,7 +297,7 @@ def num_tokens_from_messages(
             response_message=response_message,
         )
     else:
-        raise NotImplementedError(
+        logger.error(
             f"""num_tokens_from_messages() is not implemented for model {model}."""
         )
 
@@ -653,4 +653,5 @@ def count_tokens(input_str: str) -> int:
         tokens = encoding.encode(input_str)
         return len(tokens)
     except Exception:
-        raise Exception("Failed to count tokens")
+        logger.error("Failed to count tokens")
+        return 0
