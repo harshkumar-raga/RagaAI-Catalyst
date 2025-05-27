@@ -16,6 +16,9 @@ import asyncio
 from .tracer import Tracer
 from ..ragaai_catalyst import RagaAICatalyst
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Global state
 _global_tracer: Optional[Tracer] = None
 _global_catalyst: Optional[RagaAICatalyst] = None
@@ -60,9 +63,9 @@ def init_tracing(
                 _global_tracer = tracer
                 _global_catalyst = catalyst
             else:
-                raise ValueError("Both Tracer and Catalyst objects must be instances of Tracer and RagaAICatalyst, respectively.")
+                logger.error("Both Tracer and Catalyst objects must be instances of Tracer and RagaAICatalyst, respectively.")
         else:
-            raise ValueError("Both Tracer and Catalyst objects must be provided.")
+            logger.error("Both Tracer and Catalyst objects must be provided.")
 
 
 def trace_agent(name: str = None, agent_type: str = "generic", version: str = "1.0.0", **kwargs):
@@ -295,6 +298,6 @@ def current_span():
     # Finally fall back to agent context
     agent_name = tracer.current_agent_name.get()
     if not agent_name:
-        raise ValueError("No active span found. Make sure you're calling this within a traced function.")
+        logger.error("No active span found. Make sure you're calling this within a traced function.")
     
     return tracer.span(agent_name)
