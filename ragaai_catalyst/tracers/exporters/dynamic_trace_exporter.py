@@ -76,14 +76,14 @@ class DynamicTraceExporter(SpanExporter):
             # Update the exporter's properties
             self._update_exporter_properties()
         except Exception as e:
-            raise Exception(f"Error updating exporter properties: {e}")
+            logger.error(f"Error updating exporter properties: {e}")
 
         try:
             # Forward the call to the underlying exporter
             result = self._exporter.export(spans)
             return result
         except Exception as e:
-            raise Exception(f"Error exporting trace: {e}")
+            logger.error(f"Error exporting trace: {e}")
             
 
 
@@ -96,13 +96,13 @@ class DynamicTraceExporter(SpanExporter):
             # Update the exporter's properties
             self._update_exporter_properties()
         except Exception as e:
-            raise Exception(f"Error updating exporter properties: {e}")
+            logger.error(f"Error updating exporter properties: {e}")
 
         try:
             # Forward the call to the underlying exporter
             return self._exporter.shutdown()
         except Exception as e:
-            raise Exception(f"Error shutting down exporter: {e}")
+            logger.error(f"Error shutting down exporter: {e}")
     
     def _update_exporter_properties(self):
         """
