@@ -136,9 +136,7 @@ class FileSpanExporter(SpanExporter):
         """
         async with aiohttp.ClientSession() as session:
             if not os.getenv("RAGAAI_CATALYST_TOKEN"):
-                raise ValueError(
-                    "RAGAAI_CATALYST_TOKEN not found. Cannot upload traces."
-                )
+                logger.error("RAGAAI_CATALYST_TOKEN not found. Cannot upload traces.")
 
             try:
                 upload_stat = await self.raga_client.check_and_upload_files(
