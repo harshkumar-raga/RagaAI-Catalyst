@@ -53,7 +53,7 @@ def get_unique_key(input_data):
         canonical_json = normalize_string(input_data)
     else:
         # If input is neither a dictionary nor a string, raise an error
-        raise ValueError("Input must be a dictionary or a string")
+        logger.error("Input must be a dictionary or a string")
 
     # Calculate the SHA-256 hash of the canonical JSON representation
     hash_object = hashlib.sha256(canonical_json.encode())
