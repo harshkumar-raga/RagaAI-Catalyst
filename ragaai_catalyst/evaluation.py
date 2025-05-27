@@ -38,7 +38,7 @@ class Evaluation:
                 project["name"] for project in response.json()["data"]["content"]
             ]
             if project_name not in project_list:
-                raise ValueError("Project not found. Please enter a valid project name")
+                logger.error("Project not found. Please enter a valid project name")
             
             self.project_id = [
                 project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
@@ -46,7 +46,6 @@ class Evaluation:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve projects list: {e}")
-            raise
 
         try:
 
@@ -68,13 +67,12 @@ class Evaluation:
             dataset_list = [dataset["name"] for dataset in datasets_content]
 
             if dataset_name not in dataset_list:
-                raise ValueError("Dataset not found. Please enter a valid dataset name")
+                logger.error("Dataset not found. Please enter a valid dataset name")
                 
             self.dataset_id = [dataset["id"] for dataset in datasets_content if dataset["name"]==dataset_name][0]
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve dataset list: {e}")
-            raise
 
     
     def list_metrics(self):
@@ -126,7 +124,6 @@ class Evaluation:
                 return dataset["derivedDatasetId"]
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve dataset list: {e}")
-            raise
 
 
     def _get_dataset_schema(self, metric_to_evaluate=None):
@@ -175,11 +172,11 @@ class Evaluation:
                 if key in user_dataset_columns:
                     variableName=key
                 else:
-                    raise ValueError(f"Column '{key}' is not present in '{self.dataset_name}' dataset")
+                    logger.error(f"Column '{key}' is not present in '{self.dataset_name}' dataset")
         if variableName:
             return variableName
         else:
-            raise ValueError(f"Map '{schemaName}' column in schema_mapping for {metric_name} metric evaluation")
+            logger.error(f"Map '{schemaName}' column in schema_mapping for {metric_name} metric evaluation")
 
 
     def _get_mapping(self, metric_name, metrics_schema, schema_mapping):
@@ -257,11 +254,11 @@ class Evaluation:
             for key, value in metric["config"].items():
                 #checking if provider is one of the allowed providers
                 if key.lower()=="provider" and value.lower() not in sub_providers:
-                    raise ValueError("Enter a valid provider name. The following Provider names are supported: openai, azure, gemini, groq, anthropic, bedrock")
+                    logger.error("Enter a valid provider name. The following Provider names are supported: openai, azure, gemini, groq, anthropic, bedrock")
     
                 if key.lower()=="threshold":
                     if len(value)>1:
-                        raise ValueError("'threshold' can only take one argument gte/lte/eq")
+                        logger.error("'threshold' can only take one argument gte/lte/eq")
                     else:
                         for key_thres, value_thres in value.items():
                             base_json["metricSpec"]["config"]["params"][key] = {f"{key_thres}":value_thres}
@@ -314,18 +311,18 @@ class Evaluation:
         for metric in metrics:
             missing_keys = required_keys - metric.keys()
             if missing_keys:
-                raise ValueError(f"{missing_keys} required for each metric evaluation.")
+                logger.error(f"{missing_keys} required for each metric evaluation.")
 
         executed_metric_list = self._get_executed_metrics_list()
         metrics_name = self.list_metrics()
         user_metric_names = [metric["name"] for metric in metrics]
         for user_metric in user_metric_names:
             if user_metric not in metrics_name:
-                raise ValueError("Enter a valid metric name")
+                logger.error("Enter a valid metric name")
         column_names = [metric["column_name"] for metric in metrics]
         for column_name in column_names:
             if column_name in executed_metric_list:
-                raise ValueError(f"Column name '{column_name}' already exists.")
+                logger.error(f"Column name '{column_name}' already exists.")
 
         headers = {
             'Content-Type': 'application/json',
@@ -341,7 +338,7 @@ class Evaluation:
                 timeout=self.timeout
                 )
             if response.status_code == 400:
-                raise ValueError(response.json()["message"])
+                logger.error(response.json()["message"])
             response.raise_for_status()
             if response.json()["success"]:
                 print(response.json()["message"])
@@ -360,7 +357,7 @@ class Evaluation:
 
     def append_metrics(self, display_name):
         if not isinstance(display_name, str):
-            raise ValueError("display_name should be a string")
+            logger.error("display_name should be a string")
         
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
@@ -387,7 +384,7 @@ class Evaluation:
                 data=payload, 
                 timeout=self.timeout)
             if response.status_code == 400:
-                raise ValueError(response.json()["message"])
+                logger.error(response.json()["message"])
             response.raise_for_status()
             if response.json()["success"]:
                 print(response.json()["message"])
