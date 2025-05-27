@@ -1,4 +1,7 @@
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 def fetch_analysis_trace(base_url, trace_id):
     """
@@ -14,5 +17,5 @@ def fetch_analysis_trace(base_url, trace_id):
         response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching analysis trace: {e}")
+        logger.error(f"Error fetching analysis trace: {e}")
         return None
