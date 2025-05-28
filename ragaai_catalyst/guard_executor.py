@@ -24,18 +24,18 @@ class GuardExecutor:
             if input_deployment_id and output_deployment_id:
                 # check if 2 deployments are mapped to same dataset
                 if self.input_deployment_details['data']['datasetId'] != self.output_deployment_details['data']['datasetId']:
-                    raise ValueError('Input deployment and output deployment should be mapped to same dataset')
+                    logger.error('Input deployment and output deployment should be mapped to same dataset')
             for guardrail in self.input_deployment_details['data']['guardrailsResponse']:
                 maps = guardrail['metricSpec']['config']['mappings']
                 for _map in maps:
                     if _map['schemaName']=='Response':
-                        raise ValueError('Response field should be mapped only in output guardrails')
+                        logger.error('Response field should be mapped only in output guardrails')
         except Exception as e:
-            raise ValueError(str(e))
+            logger.error(str(e))
         self.base_url = guard_manager.base_url
         for key in field_map.keys():
             if key not in ['prompt','context','response','instruction']:
-                print('Keys in field map should be in ["prompt","context","response","instruction"]')
+                logger.error('Keys in field map should be in ["prompt","context","response","instruction"]')
         self.current_trace_id = None
         self.id_2_doc = {}
 
@@ -52,10 +52,10 @@ class GuardExecutor:
         try:
             response = requests.request("POST", api, headers=headers, data=payload,timeout=self.guard_manager.timeout)
         except Exception as e:
-            print('Failed running guardrail: ',str(e))
+            logger.error('Failed running guardrail: ',str(e))
             return None
         if response.status_code!=200:
-            print('Error in running deployment ',response.json()['message'])
+            logger.error('Error in running deployment ',response.json()['message'])
         if response.json()['success']:
             return response.json()
         else:
@@ -152,7 +152,7 @@ class GuardExecutor:
         for key in self.field_map:
             if key not in ['prompt', 'response']:
                 if self.field_map[key] not in prompt_params:
-                    raise ValueError(f'{key} added as field map but not passed as prompt parameter')
+                    logger.error(f'{key} added as field map but not passed as prompt parameter')
         context_var = self.field_map.get('context', None)
         
         doc = dict()
@@ -177,7 +177,7 @@ class GuardExecutor:
     def execute_output_guardrails(self, llm_response: str, prompt=None, prompt_params=None) -> None:
         if not prompt: # user has not passed input
             if self.current_trace_id not in self.id_2_doc:
-                raise Exception(f'No input doc found for trace_id: {self.current_trace_id}')
+                logger.error(f'No input doc found for trace_id: {self.current_trace_id}')
             else:
                 doc = self.id_2_doc[self.current_trace_id]
                 doc['response'] = llm_response

@@ -76,12 +76,12 @@ def _fetch_dataset_code_hashes(project_name, dataset_name, base_url=None, timeou
             if response.status_code == 200:
                 return response.json()["data"]["codeHashes"]
             else:
-                raise Exception(
+                logger.error(
                     f"Failed to fetch code hashes: {response.json()['message']}"
                 )
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to list datasets: {e}")
-        raise
+        pass
 
 
 def update_presigned_url(presigned_url, base_url):
@@ -164,19 +164,13 @@ def _fetch_presigned_url(project_name, dataset_name, base_url=None, timeout=120)
                     logger.error(
                         f"Failed to fetch code hashes: {response.json()['message']}"
                     )
-                    raise Exception(
-                        f"Failed to fetch code hashes: {response.json()['message']}"
-                    )
             else:
                 logger.error(
                     f"Failed to fetch code hashes: {response.json()['message']}"
                 )
-                raise Exception(
-                    f"Failed to fetch code hashes: {response.json()['message']}"
-                )
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to list datasets: {e}")
-        raise
+        pass
 
 
 def _put_zip_presigned_url(project_name, presignedUrl, filename, timeout=120):
@@ -252,9 +246,11 @@ def _insert_code(
             if response.status_code == 200:
                 return response.json()["message"]
             else:
-                raise Exception(f"Failed to insert code: {response.json()['message']}")
+                logger.error(f"Failed to insert code: {response.json()['message']}")
+                pass
         else:
-            raise Exception(f"Failed to insert code: {response.json()['message']}")
+            logger.error(f"Failed to insert code: {response.json()['message']}")
+            pass
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to insert code: {e}")
-        raise
+        pass

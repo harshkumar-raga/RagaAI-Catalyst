@@ -166,7 +166,7 @@ class Tracer(AgenticTracing):
                 project["name"] for project in response.json()["data"]["content"]
             ]
             if project_name not in project_list:
-                raise ValueError("Project not found. Please enter a valid project name")
+                logger.error("Project not found. Please enter a valid project name")
             
             self.project_id = [
                 project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
@@ -177,7 +177,6 @@ class Tracer(AgenticTracing):
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve projects list: {e}")
-            raise
 
         # if tracer_type == "langchain":
         #     instrumentors = []
@@ -367,11 +366,11 @@ class Tracer(AgenticTracing):
             })
         """
         if not isinstance(cost_config, dict):
-            raise TypeError("cost_config must be a dictionary")
+            logger.error("cost_config must be a dictionary")
 
         required_keys = {"model_name", "input_cost_per_million_token", "output_cost_per_million_token"}
         if not all(key in cost_config for key in required_keys):
-            raise ValueError(f"cost_config must contain all required keys: {required_keys}")
+            logger.error(f"cost_config must contain all required keys: {required_keys}")
 
         model_name = cost_config["model_name"]
         self.model_custom_cost[model_name] = {
@@ -400,7 +399,7 @@ class Tracer(AgenticTracing):
                     return value
         """
         if not callable(masking_func):
-            raise TypeError("masking_func must be a callable")
+            logger.error("masking_func must be a callable")
 
         def recursive_mask_values(obj, parent_key=None):
             """Apply masking to all values in nested structure."""
@@ -475,7 +474,7 @@ class Tracer(AgenticTracing):
                 def post_processor_func(original_trace_json_path: os.PathLike) -> os.PathLike
         """
         if not callable(post_processor_func):
-            raise TypeError("post_processor_func must be a callable")
+            logger.error("post_processor_func must be a callable")
         self.post_processor = post_processor_func
         # Register in parent AgenticTracing class
         super().register_post_processor(post_processor_func)
@@ -578,7 +577,7 @@ class Tracer(AgenticTracing):
             "llama_index": LlamaIndexInstrumentor,
         }
         if tracer_type not in instrumentors:
-            raise ValueError(f"Invalid tracer type: {tracer_type}")
+            logger.error(f"Invalid tracer type: {tracer_type}")
         return instrumentors[tracer_type]().get()
 
     @contextmanager
@@ -699,9 +698,7 @@ class Tracer(AgenticTracing):
         """
         async with aiohttp.ClientSession() as session:
             if not os.getenv("RAGAAI_CATALYST_TOKEN"):
-                raise ValueError(
-                    "RAGAAI_CATALYST_TOKEN not found. Cannot upload traces."
-                )
+                logger.error("RAGAAI_CATALYST_TOKEN not found. Cannot upload traces.")
 
             try:
                 upload_stat = await asyncio.wait_for(
@@ -785,7 +782,7 @@ class Tracer(AgenticTracing):
             AttributeError: If the tracer_type is not an agentic tracer or if the dynamic_exporter is not initialized.
         """
         if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
-            raise AttributeError("This method is only available for agentic tracers with a dynamic exporter.")
+            logger.error("This method is only available for agentic tracers with a dynamic exporter.")
             
         for key, value in kwargs.items():
             if hasattr(self.dynamic_exporter, key):
@@ -852,7 +849,7 @@ class Tracer(AgenticTracing):
             AttributeError: If the tracer_type is not 'agentic/llamaindex' or if the dynamic_exporter is not initialized.
         """
         if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
-            raise AttributeError("This method is only available for agentic tracers with a dynamic exporter.")
+            logger.error("This method is only available for agentic tracers with a dynamic exporter.")
             
         # Get the latest list of unique files
         list_of_unique_files = self.file_tracker.get_unique_files()

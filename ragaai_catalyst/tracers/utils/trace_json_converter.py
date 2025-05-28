@@ -216,7 +216,7 @@ def convert_json_format(
                         logger.warning(f"Failed to calculate span cost: {e}")
 
     except Exception as e:
-        raise Exception(f"Error in get_spans function: {e}")
+        logger.error(f"Error in get_spans function: {e}")
 
     # Total metadata summary
     final_trace["metadata"]["total_cost"] = final_trace["metadata"]["cost"][
