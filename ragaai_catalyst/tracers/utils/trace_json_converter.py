@@ -187,6 +187,8 @@ def convert_json_format(
                     span["attributes"].get("llm.model_name", "") for span in spans
                 ]
                 model_name = next((name for name in reversed(model_names) if name), "")
+                if not model_name and span["attributes"].get("openinference.span.kind")=="LLM":
+                    model_name = json.loads(span["attributes"].get("metadata", "")).get("ls_model_name", "")
                 if model_name:
                     try:
                         model_costs = get_model_cost()
