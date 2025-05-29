@@ -365,20 +365,8 @@ class Tracer(AgenticTracing):
                 "output_cost_per_million_token": 2.40
             })
         """
-        if not isinstance(cost_config, dict):
-            logger.error("cost_config must be a dictionary")
-
-        required_keys = {"model_name", "input_cost_per_million_token", "output_cost_per_million_token"}
-        if not all(key in cost_config for key in required_keys):
-            logger.error(f"cost_config must contain all required keys: {required_keys}")
-
-        model_name = cost_config["model_name"]
-        self.model_custom_cost[model_name] = {
-            "input_cost_per_token": float(cost_config["input_cost_per_million_token"])/ 1000000,
-            "output_cost_per_token": float(cost_config["output_cost_per_million_token"]) /1000000
-        }
-        self.dynamic_exporter.custom_model_cost = self.model_custom_cost
-        logger.info(f"Updated custom model cost for {model_name}: {self.model_custom_cost[model_name]}")
+        # No-op function - doesn't perform any operation
+        pass
         
 
     def register_masking_function(self, masking_func):
