@@ -506,8 +506,6 @@ class Evaluation:
         response_text = parse_response()
         if response_text:
             df = pd.read_csv(io.StringIO(response_text))
-
-            column_list = df.columns.to_list()
-            return df[column_list]
+            return df
         else:
             return pd.DataFrame()
