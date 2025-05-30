@@ -418,7 +418,8 @@ class Tracer(AgenticTracing):
                         'telemetry.sdk.language','service.name', 'llm.model_name',
                         'llm.invocation_parameters', 'metadata', 'openinference.span.kind',
                         'llm.token_count.prompt', 'llm.token_count.completion', 'llm.token_count.total',
-                        "input_cost", "output_cost", "total_cost", "status_code"
+                        "input_cost", "output_cost", "total_cost", "status_code", "output.mime_type",
+                        "span_id", "trace_id"
                     }
                     # Apply masking only if the key is NOT in the excluded list
                     if parent_key and parent_key.lower() not in excluded_keys:
