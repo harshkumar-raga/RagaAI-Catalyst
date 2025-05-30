@@ -365,6 +365,8 @@ class Tracer(AgenticTracing):
                 "output_cost_per_million_token": 2.40
             })
         """
+        logger.info("DEPRECATED: The set_model_cost method is deprecated and will be removed in a future version. Custom model costs can now be configured directly through the RagaAI Catalyst Platform")
+        print("DEPRECATED: The set_model_cost method is deprecated and will be removed in a future version. Custom model costs can now be configured directly through the RagaAI Catalyst Platform")
         # if not isinstance(cost_config, dict):
         #     logger.error("cost_config must be a dictionary")
 
