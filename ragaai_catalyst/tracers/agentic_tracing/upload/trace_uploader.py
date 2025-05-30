@@ -390,10 +390,10 @@ def get_upload_queue_status():
             "active_workers": 0,
             "max_workers": 0
         }
-
-    pending_count = len([f for f in _futures.values() if not f.done()])
-    completed_count = len([f for f in _futures.values() if f.done() and not f.exception()])
-    failed_count = len([f for f in _futures.values() if f.done() and f.exception()])
+    with _futures_lock:
+        pending_count = len([f for f in _futures.values() if not f.done()])
+        completed_count = len([f for f in _futures.values() if f.done() and not f.exception()])
+        failed_count = len([f for f in _futures.values() if f.done() and f.exception()])
 
     # Try to get thread pool queue size (may not be available in all Python versions)
     queue_size = 0
