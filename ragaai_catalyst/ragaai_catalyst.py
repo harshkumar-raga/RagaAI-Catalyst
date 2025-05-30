@@ -48,9 +48,6 @@ class RagaAICatalyst:
             logger.error(
                 "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
             )
-            raise ValueError(
-                "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
-            )
 
         RagaAICatalyst.access_key, RagaAICatalyst.secret_key = (
             self._set_access_key_secret_key(access_key, secret_key)
@@ -79,9 +76,7 @@ class RagaAICatalyst:
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = RagaAICatalyst.BASE_URL
                 RagaAICatalyst.get_token(force_refresh=True)
             except requests.exceptions.RequestException:
-                raise ConnectionError(
-                    "The provided base_url is not accessible. Please re-check the base_url."
-                )
+                logger.error("The provided base_url is not accessible. Please re-check the base_url.")
         else:
             # Get the token from the server
             RagaAICatalyst.get_token(force_refresh=True)
@@ -264,7 +259,7 @@ class RagaAICatalyst:
             if response.status_code == 400:
                 token_response = response.json()
                 if token_response.get("message") == "Please enter valid credentials":
-                    raise Exception(
+                    logger.error(
                         "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
                     )
 
@@ -379,13 +374,13 @@ class RagaAICatalyst:
         # Check if the project already exists
         existing_projects = self.list_projects()
         if project_name in existing_projects:
-            raise ValueError(
+            logger.error(
                 f"Project name '{project_name}' already exists. Please choose a different name."
             )
 
         usecase_list = self.project_use_cases()
         if usecase not in usecase_list:
-            raise ValueError(f"Select a valid usecase from {usecase_list}")
+            logger.error(f"Select a valid usecase from {usecase_list}")
 
         json_data = {"name": project_name, "type": type, "usecase": usecase}
         headers = {
