@@ -245,19 +245,19 @@ def cleanup_completed_futures():
     with _cleanup_lock:
         if current_time - _last_cleanup < CLEANUP_INTERVAL:
             return  # Double-check after acquiring lock
+        with _futures_lock:
+            completed_tasks = []
+            for task_id, future in _futures.items():
+                if future.done():
+                    completed_tasks.append(task_id)
 
-        completed_tasks = []
-        for task_id, future in _futures.items():
-            if future.done():
-                completed_tasks.append(task_id)
+            for task_id in completed_tasks:
+                del _futures[task_id]
 
-        for task_id in completed_tasks:
-            del _futures[task_id]
+            _last_cleanup = current_time
 
-        _last_cleanup = current_time
-
-        if completed_tasks:
-            logger.info(f"Cleaned up {len(completed_tasks)} completed futures")
+            if completed_tasks:
+                logger.info(f"Cleaned up {len(completed_tasks)} completed futures")
 
 def save_task_status(task_status: Dict[str, Any]):
     """Save task status to a file"""
