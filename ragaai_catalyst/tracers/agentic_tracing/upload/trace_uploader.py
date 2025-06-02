@@ -20,6 +20,7 @@ from logging.handlers import RotatingFileHandler
 import concurrent.futures
 from typing import Dict, Any, Optional
 import threading
+import uuid
 
 # Set up logging
 log_dir = os.path.join(tempfile.gettempdir(), "ragaai_logs")
@@ -75,6 +76,11 @@ _futures_lock = threading.Lock()
 _cleanup_lock = threading.Lock()
 _last_cleanup = 0
 CLEANUP_INTERVAL = 300  # 5 minutes
+
+# Thread-safe counter for task IDs
+_task_counter = 0
+_task_counter_lock = threading.Lock()
+
 def get_executor(max_workers=None):
     """Get or create the thread pool executor"""
     global _executor
@@ -92,9 +98,21 @@ def get_executor(max_workers=None):
             atexit.register(shutdown)
         return _executor
 
+
+def generate_unique_task_id():
+    """Generate a thread-safe unique task ID"""
+    global _task_counter
+
+    with _task_counter_lock:
+        _task_counter += 1
+        counter = _task_counter
+
+    unique_id = str(uuid.uuid4())[:8]  # Short UUID
+    return f"task_{int(time.time())}_{os.getpid()}_{counter}_{unique_id}"
+
 def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str, 
                   project_name: str, project_id: str, dataset_name: str, 
-                  user_details: Dict[str, Any], base_url: str, timeout=120) -> Dict[str, Any]:
+                  user_details: Dict[str, Any], base_url: str, timeout=120, fail_on_trace_error=True) -> Dict[str, Any]:
     """
     Process a single upload task
     
@@ -108,7 +126,7 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
         dataset_name: Dataset name
         user_details: User details dictionary
         base_url: Base URL for API calls
-        
+        fail_on_trace_error: If True, raise exception when trace upload fails
     Returns:
         Dict containing status and any error information
     """
@@ -193,13 +211,32 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                     base_url=base_url,   
                     timeout=timeout
                 )
-                upload_traces.upload_agentic_traces()
-                logger.info("Agentic traces uploaded successfully")
+                upload_success = upload_traces.upload_agentic_traces()
+                if upload_success:
+                    logger.info("Agentic traces uploaded successfully")
+                else:
+                    error_msg = "Agentic traces upload failed"
+                    logger.error(error_msg)
+
+                    if fail_on_trace_error:
+                        result["status"] = STATUS_FAILED
+                        result["error"] = error_msg
+                        result["end_time"] = datetime.now().isoformat()
+                        save_task_status(result)
+                        raise Exception(error_msg)
             except Exception as e:
                 logger.error(f"Error uploading agentic traces: {e}")
+
                 # Continue with code upload
         else:
+            error_msg = f"Trace file {filepath} not found"
             logger.warning(f"Trace file {filepath} not found, skipping traces upload")
+            if fail_on_trace_error:
+                result["status"] = STATUS_FAILED
+                result["error"] = error_msg
+                result["end_time"] = datetime.now().isoformat()
+                save_task_status(result)
+                raise FileNotFoundError(error_msg)
         
         # Step 4: Upload code hash
         if hash_id and zip_path and os.path.exists(zip_path):
@@ -295,13 +332,17 @@ def submit_upload_task(filepath, hash_id, zip_path, project_name, project_id, da
     filepath = os.path.abspath(filepath)
     logger.debug(f"Using absolute filepath: {filepath}")
 
-    # Generate a unique task ID
-    task_id = f"task_{int(time.time())}_{os.getpid()}_{hash(str(time.time()))}"
+    # # Generate a unique task ID
+    # task_id = f"task_{int(time.time())}_{os.getpid()}_{hash(str(time.time()))}"
+
+    # Generate a thread-safe unique task ID
+    task_id = generate_unique_task_id()
+    logger.debug(f"Generated task ID: {task_id}")
     
     # Submit the task to the executor
     executor = get_executor()
     # Cleanup completed futures periodically
-    cleanup_completed_futures()
+    # cleanup_completed_futures()
     future = executor.submit(
         process_upload,
         task_id=task_id,
@@ -313,11 +354,17 @@ def submit_upload_task(filepath, hash_id, zip_path, project_name, project_id, da
         dataset_name=dataset_name,
         user_details=user_details,
         base_url=base_url,
-        timeout=timeout
+        timeout=timeout,
+        fail_on_trace_error=True
     )
     
     # Store the future for later status checks
-    with _executor_lock:
+    with _futures_lock:
+        # Double-check for uniqueness (extra safety)
+        if task_id in _futures:
+            logger.warning(f"Task ID collision detected: {task_id}. Regenerating...")
+            task_id = generate_unique_task_id()
+            logger.info(f"New task ID: {task_id}")
         _futures[task_id] = future
     
     # Create initial status
@@ -377,8 +424,9 @@ def get_task_status(task_id):
 
 def get_upload_queue_status():
     """Get detailed status of upload queue"""
-    with _executor_lock:
-        executor = get_executor()
+    logger.info("Reached get queue status")
+    # with _executor_lock:
+    executor = get_executor()
 
     if executor is None:
         return {
@@ -390,10 +438,10 @@ def get_upload_queue_status():
             "active_workers": 0,
             "max_workers": 0
         }
-    with _futures_lock:
-        pending_count = len([f for f in _futures.values() if not f.done()])
-        completed_count = len([f for f in _futures.values() if f.done() and not f.exception()])
-        failed_count = len([f for f in _futures.values() if f.done() and f.exception()])
+    # with _futures_lock:
+    pending_count = len([f for f in _futures.values() if not f.done()])
+    completed_count = len([f for f in _futures.values() if f.done() and not f.exception()])
+    failed_count = len([f for f in _futures.values() if f.done() and f.exception()])
 
     # Try to get thread pool queue size (may not be available in all Python versions)
     queue_size = 0
@@ -416,13 +464,16 @@ def get_upload_queue_status():
 
 def shutdown(timeout=120):
     """Enhanced shutdown with manual timeout and progress reporting"""
+    logger.info("Reached shutdown of executor")
     global _executor, _futures
     with _executor_lock:
         if _executor is None:
+            logger.info("Executor is none in shutdown")
             return
 
     # Log current state
     status = get_upload_queue_status()
+    logger.info(f"Queue status: {status}")
     logger.info(f"Shutting down uploader. Pending uploads: {status['pending_uploads']}")
 
     if status['pending_uploads'] > 0:
@@ -453,9 +504,12 @@ def shutdown(timeout=120):
                 time.sleep(0.5)
         else:
             # Timeout reached
+            logger.info("Executor timeout reached")
             with _futures_lock:
                 pending_futures = [f for f in _futures.values() if not f.done()]
-                logger.warning(f"Shutdown timeout reached. {len(pending_futures)} uploads still pending.")
+                logger.info(f"Shutdown timeout reached. {len(pending_futures)} uploads still pending.")
+    else:
+        logger.info(f"No pending uploads")
 
     # Shutdown the executor
     try:
