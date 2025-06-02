@@ -95,7 +95,7 @@ def get_executor(max_workers=None):
                 max_workers=max_workers,
                 thread_name_prefix="trace_uploader"
             )
-            atexit.register(shutdown)
+            # atexit.register(shutdown)
         return _executor
 
 
@@ -332,51 +332,86 @@ def submit_upload_task(filepath, hash_id, zip_path, project_name, project_id, da
     filepath = os.path.abspath(filepath)
     logger.debug(f"Using absolute filepath: {filepath}")
 
-    # # Generate a unique task ID
-    # task_id = f"task_{int(time.time())}_{os.getpid()}_{hash(str(time.time()))}"
-
     # Generate a thread-safe unique task ID
     task_id = generate_unique_task_id()
     logger.debug(f"Generated task ID: {task_id}")
+
+    # Function to handle synchronous processing
+    def do_sync_processing():
+        try:
+            logger.info(f"Processing task {task_id} synchronously...")
+            result = process_upload(
+                task_id=task_id,
+                filepath=filepath,
+                hash_id=hash_id,
+                zip_path=zip_path,
+                project_name=project_name,
+                project_id=project_id,
+                dataset_name=dataset_name,
+                user_details=user_details,
+                base_url=base_url,
+                timeout=timeout,
+                fail_on_trace_error=True
+            )
+            logger.info(f"Synchronous processing completed for {task_id}: {result}")
+            return task_id
+        except Exception as e:
+            logger.error(f"Error in synchronous processing: {e}")
+            return None
     
-    # Submit the task to the executor
+    # Try to get the executor
     executor = get_executor()
-    # Cleanup completed futures periodically
-    # cleanup_completed_futures()
-    future = executor.submit(
-        process_upload,
-        task_id=task_id,
-        filepath=filepath,
-        hash_id=hash_id,
-        zip_path=zip_path,
-        project_name=project_name,
-        project_id=project_id,
-        dataset_name=dataset_name,
-        user_details=user_details,
-        base_url=base_url,
-        timeout=timeout,
-        fail_on_trace_error=True
-    )
-    
-    # Store the future for later status checks
-    with _futures_lock:
-        # Double-check for uniqueness (extra safety)
-        if task_id in _futures:
-            logger.warning(f"Task ID collision detected: {task_id}. Regenerating...")
-            task_id = generate_unique_task_id()
-            logger.info(f"New task ID: {task_id}")
-        _futures[task_id] = future
-    
-    # Create initial status
-    initial_status = {
-        "task_id": task_id,
-        "status": STATUS_PENDING,
-        "error": None,
-        "start_time": datetime.now().isoformat()
-    }
-    save_task_status(initial_status)
-    
-    return task_id
+    if executor is None:
+        logger.warning("Executor is None or shutdown in progress, processing synchronously")
+        return do_sync_processing()
+
+    # Try to submit the task to the executor
+    try:
+        # Cleanup completed futures periodically
+        future = executor.submit(
+            process_upload,
+            task_id=task_id,
+            filepath=filepath,
+            hash_id=hash_id,
+            zip_path=zip_path,
+            project_name=project_name,
+            project_id=project_id,
+            dataset_name=dataset_name,
+            user_details=user_details,
+            base_url=base_url,
+            timeout=timeout,
+            fail_on_trace_error=True
+        )
+        
+        # Store the future for later status checks
+        with _futures_lock:
+            # Double-check for uniqueness (extra safety)
+            if task_id in _futures:
+                logger.warning(f"Task ID collision detected: {task_id}. Regenerating...")
+                task_id = generate_unique_task_id()
+                logger.info(f"New task ID: {task_id}")
+            _futures[task_id] = future
+        
+        # Create initial status
+        initial_status = {
+            "task_id": task_id,
+            "status": STATUS_PENDING,
+            "error": None,
+            "start_time": datetime.now().isoformat()
+        }
+        save_task_status(initial_status)
+        
+        return task_id
+    except RuntimeError as e:
+        if "cannot schedule new futures after shutdown" in str(e):
+            logger.warning(f"Executor already shut down, falling back to synchronous processing: {e}")
+            return do_sync_processing()
+        else:
+            logger.error(f"Error submitting task: {e}")
+            return None
+    except Exception as e:
+        logger.error(f"Error submitting task: {e}")
+        return None
 
 def get_task_status(task_id):
     """
@@ -521,7 +556,7 @@ def shutdown(timeout=120):
     _executor = None
 
 # Register shutdown handler
-# atexit.register(shutdown)
+atexit.register(shutdown)
 
 # For backward compatibility
 def ensure_uploader_running():
