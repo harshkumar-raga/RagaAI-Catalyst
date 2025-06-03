@@ -223,7 +223,6 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                         result["error"] = error_msg
                         result["end_time"] = datetime.now().isoformat()
                         save_task_status(result)
-                        raise Exception(error_msg)
             except Exception as e:
                 logger.error(f"Error uploading agentic traces: {e}")
 
@@ -236,7 +235,7 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                 result["error"] = error_msg
                 result["end_time"] = datetime.now().isoformat()
                 save_task_status(result)
-                raise FileNotFoundError(error_msg)
+                logger.error(error_msg)
         
         # Step 4: Upload code hash
         if hash_id and zip_path and os.path.exists(zip_path):
@@ -364,7 +363,8 @@ def submit_upload_task(filepath, hash_id, zip_path, project_name, project_id, da
     if executor is None:
         logger.warning("Executor is None or shutdown in progress, processing synchronously")
         return do_sync_processing()
-
+    # Cleanup completed futures periodically
+    # cleanup_completed_futures()
     # Try to submit the task to the executor
     try:
         # Cleanup completed futures periodically
@@ -499,20 +499,20 @@ def get_upload_queue_status():
 
 def shutdown(timeout=120):
     """Enhanced shutdown with manual timeout and progress reporting"""
-    logger.info("Reached shutdown of executor")
+    logger.debug("Reached shutdown of executor")
     global _executor, _futures
     with _executor_lock:
         if _executor is None:
-            logger.info("Executor is none in shutdown")
+            logger.debug("Executor is none in shutdown")
             return
 
     # Log current state
     status = get_upload_queue_status()
-    logger.info(f"Queue status: {status}")
-    logger.info(f"Shutting down uploader. Pending uploads: {status['pending_uploads']}")
+    logger.debug(f"Queue status: {status}")
+    logger.debug(f"Shutting down uploader. Pending uploads: {status['pending_uploads']}")
 
     if status['pending_uploads'] > 0:
-        logger.info(f"Waiting up to {timeout}s for {status['pending_uploads']} uploads to complete...")
+        logger.debug(f"Waiting up to {timeout}s for {status['pending_uploads']} uploads to complete...")
 
         start_time = time.time()
         last_report = start_time
@@ -542,7 +542,7 @@ def shutdown(timeout=120):
             logger.info("Executor timeout reached")
             with _futures_lock:
                 pending_futures = [f for f in _futures.values() if not f.done()]
-                logger.info(f"Shutdown timeout reached. {len(pending_futures)} uploads still pending.")
+                logger.debug(f"Shutdown timeout reached. {len(pending_futures)} uploads still pending.")
     else:
         logger.info(f"No pending uploads")
 

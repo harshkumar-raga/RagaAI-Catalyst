@@ -76,7 +76,7 @@ class RAGATraceExporter(SpanExporter):
 
     def shutdown(self):
         # Process any remaining traces during shutdown
-        logger.info("Reached shutdown of exported")
+        logger.debug("Reached shutdown of exporter")
         for trace_id, spans in self.trace_spans.items():
             self.process_complete_trace(spans, trace_id)
         self.trace_spans.clear()
