@@ -151,7 +151,7 @@ class UploadAgenticTraces:
                 "PUT", presignedUrl, headers=headers, data=payload, timeout=self.timeout
             )
             elapsed_ms = (time.time() - start_time) * 1000
-            logger.info(
+            logger.debug(
                 f"API Call: [PUT] {presignedUrl} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
             if response.status_code != 200 or response.status_code != 201:
