@@ -516,41 +516,8 @@ class Tracer(AgenticTracing):
         Args:
             dataset_name (str): The new dataset name to set
         """
-        # If we have a dynamic exporter, update its dataset_name property
-        if self.tracer_type == "agentic/llamaindex" and hasattr(self, "dynamic_exporter"):
-            # Update the dataset name in the dynamic exporter
-            self.dynamic_exporter.dataset_name = dataset_name
-            logger.debug(f"Updated dynamic exporter's dataset_name to {dataset_name}")
-            
-            # Update the instance variable
-            self.dataset_name = dataset_name
-            
-            # Update user_details with new dataset_name
-            self.user_details = self._pass_user_data()
-            
-            # Also update the user_details in the dynamic exporter
-            self.dynamic_exporter.user_details = self.user_details
-        else:
-            current_params = {
-            'project_name': self.project_name,
-            'trace_name': self.trace_name,
-            'tracer_type': self.tracer_type,
-            'pipeline': self.pipeline,
-            'metadata': self.metadata,
-            'description': self.description,
-            'timeout': self.timeout,
-            'update_llm_cost': self.update_llm_cost,
-            'auto_instrumentation': self.auto_instrumentation,
-            'interval_time': self.interval_time,
-            'max_upload_workers': self.max_upload_workers,
-            'external_id': self.external_id
-        }
-            
-            # Reinitialize self with new dataset_name and stored parameters
-            self.__init__(
-                dataset_name=dataset_name,
-                **current_params
-            )
+        self.dynamic_exporter.dataset_name = dataset_name
+        logger.debug(f"Updated dynamic exporter's dataset_name to {dataset_name}")
 
     def _improve_metadata(self, metadata, tracer_type):
         if metadata is None:
