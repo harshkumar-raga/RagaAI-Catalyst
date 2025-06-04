@@ -385,11 +385,6 @@ def submit_upload_task(filepath, hash_id, zip_path, project_name, project_id, da
         
         # Store the future for later status checks
         with _futures_lock:
-            # Double-check for uniqueness (extra safety)
-            if task_id in _futures:
-                logger.warning(f"Task ID collision detected: {task_id}. Regenerating...")
-                task_id = generate_unique_task_id()
-                logger.info(f"New task ID: {task_id}")
             _futures[task_id] = future
         
         # Create initial status
