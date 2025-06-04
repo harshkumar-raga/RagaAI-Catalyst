@@ -510,9 +510,7 @@ class Tracer(AgenticTracing):
 
     def set_dataset_name(self, dataset_name):
         """
-        Reinitialize the Tracer with a new dataset name while keeping all other parameters the same.
-        If using agentic/llamaindex tracer with dynamic exporter, update the exporter's dataset_name property.
-        
+        This method updates the dataset_name attribute of the dynamic exporter.
         Args:
             dataset_name (str): The new dataset name to set
         """
