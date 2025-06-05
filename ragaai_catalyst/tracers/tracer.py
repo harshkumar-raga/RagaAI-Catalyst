@@ -884,3 +884,12 @@ class Tracer(AgenticTracing):
             self.metadata = user_metadata
         else:
             logger.warning("metadata must be a dictionary")
+
+    def set_project_name(self, project_name):
+        """
+        This method updates the project_name attribute of the dynamic exporter.
+        Args:
+            project_name (str): The new project name to set
+        """
+        self.dynamic_exporter.project_name = project_name
+        logger.debug(f"Updated dynamic exporter's project_name to {project_name}")
